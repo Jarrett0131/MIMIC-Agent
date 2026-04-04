@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Node / Vite
+node_modules/
+frontend/dist/
+*.local
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# MIMIC 数据文件通常较大，不上传；保留目录占位
+data/mimic_demo/*.csv
+data/mimic_demo/*.parquet
+data/mimic_demo/*.gz
