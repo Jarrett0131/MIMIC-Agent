@@ -1,11 +1,5 @@
 """
-患者与入院相关查询：根据 hadm_id 关联 patients、admissions、icustays。
-
-仅返回结构化字段，不生成自然语言。
-
-【需要根据实际 CSV 列名调整】
-- MIMIC-IV patients 表常用 subject_id, gender, anchor_age；若 Demo 使用 age 列请改 _pick_patient_age。
-- admissions 常用 admittime, dischtime；列名大小写需与 CSV 一致。
+患者概览：admissions + patients + icustays。
 """
 
 from __future__ import annotations
@@ -14,127 +8,81 @@ from typing import Any
 
 import pandas as pd
 
-from app.data_loader import get_admissions, get_icustays, get_patients
+from app.data_loader import data_loader
 
 
-def _pick_patient_age(row: pd.Series) -> int | None:
-    """从患者行中取年龄字段（不同版本列名可能不同）。"""
-    # 【需要根据实际 CSV 列名调整】
-    for col in ("anchor_age", "age"):
-        if col in row.index and pd.notna(row[col]):
-            try:
-                return int(row[col])
-            except (TypeError, ValueError):
-                return None
-    return None
-
-
-def get_subject_id_for_hadm(hadm_id: int) -> int | None:
-    """由 hadm_id 解析 subject_id。"""
-    adm = get_admissions()
-    if adm.empty or "hadm_id" not in adm.columns:
+def _scalar_or_none(val: Any) -> Any:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
-    sub = adm.loc[adm["hadm_id"] == hadm_id]
-    if sub.empty or "subject_id" not in sub.columns:
-        return None
-    val = sub.iloc[0]["subject_id"]
-    return int(val) if pd.notna(val) else None
+    if hasattr(val, "isoformat"):
+        try:
+            return val.isoformat()
+        except (TypeError, ValueError):
+            return str(val)
+    return val
 
 
-def get_admission_times(hadm_id: int) -> tuple[pd.Timestamp | None, pd.Timestamp | None]:
-    """返回 (admittime, dischtime)。"""
-    adm = get_admissions()
+def get_patient_overview(hadm_id: int) -> dict[str, Any]:
+    """
+    根据 hadm_id 汇总入院、患者维度、（按 intime 最早一条）ICU 时间。
+    查无入院记录时返回 {}。
+    """
+    adm = data_loader.admissions
     if adm.empty or "hadm_id" not in adm.columns:
-        return None, None
+        return {}
+
     sub = adm.loc[adm["hadm_id"] == hadm_id]
     if sub.empty:
-        return None, None
+        return {}
+
     row = sub.iloc[0]
-    admittime = pd.to_datetime(row["admittime"], errors="coerce") if "admittime" in row.index else pd.NaT
-    dischtime = pd.to_datetime(row["dischtime"], errors="coerce") if "dischtime" in row.index else pd.NaT
-    a = admittime if pd.notna(admittime) else None
-    d = dischtime if pd.notna(dischtime) else None
-    return a, d
+    # TODO: 列名可能随 MIMIC 版本变化，常见为 subject_id
+    if "subject_id" not in row.index or pd.isna(row["subject_id"]):
+        return {}
+    subject_id = int(row["subject_id"])
 
+    gender: str | None = None
+    age: int | None = None
+    pat = data_loader.patients
+    if not pat.empty and "subject_id" in pat.columns:
+        pr = pat.loc[pat["subject_id"] == subject_id]
+        if not pr.empty:
+            p0 = pr.iloc[0]
+            # TODO: 性别列名可能是 gender / gndr 等
+            if "gender" in p0.index and pd.notna(p0["gender"]):
+                gender = str(p0["gender"])
+            # TODO: 年龄列名可能是 anchor_age / age 等
+            for age_col in ("anchor_age", "age"):
+                if age_col in p0.index and pd.notna(p0[age_col]):
+                    try:
+                        age = int(p0[age_col])
+                    except (TypeError, ValueError):
+                        age = None
+                    break
 
-def get_anchor_start_for_hadm(hadm_id: int) -> pd.Timestamp | None:
-    """
-    “最近 24 小时”窗口起点：优先该次入院的第一条 ICU intime，否则用 admittime。
-    """
-    icu = get_icustays()
+    admittime = row["admittime"] if "admittime" in row.index else None
+    dischtime = row["dischtime"] if "dischtime" in row.index else None
+
+    icu_intime: Any = None
+    icu_outtime: Any = None
+    icu = data_loader.icustays
     if not icu.empty and "hadm_id" in icu.columns and "intime" in icu.columns:
-        sub = icu.loc[icu["hadm_id"] == hadm_id].copy()
-        if not sub.empty:
-            sub["_intime"] = pd.to_datetime(sub["intime"], errors="coerce")
-            sub = sub.dropna(subset=["_intime"])
-            if not sub.empty:
-                return sub["_intime"].min()
-    admittime, _ = get_admission_times(hadm_id)
-    return admittime
+        icu_sub = icu.loc[icu["hadm_id"] == hadm_id].copy()
+        if not icu_sub.empty:
+            icu_sub["_intime_parsed"] = pd.to_datetime(
+                icu_sub["intime"], errors="coerce"
+            )
+            icu_sub = icu_sub.sort_values("_intime_parsed", kind="mergesort")
+            i0 = icu_sub.iloc[0]
+            icu_intime = i0["intime"] if "intime" in i0.index else None
+            icu_outtime = i0["outtime"] if "outtime" in i0.index else None
 
-
-def get_patient_demographics(subject_id: int) -> dict[str, Any]:
-    """根据 subject_id 取性别、年龄等。"""
-    pat = get_patients()
-    if pat.empty or "subject_id" not in pat.columns:
-        return {}
-    sub = pat.loc[pat["subject_id"] == subject_id]
-    if sub.empty:
-        return {}
-    row = sub.iloc[0]
-    gender = row["gender"] if "gender" in row.index else None
-    if pd.isna(gender):
-        gender = None
-    else:
-        gender = str(gender)
-    age = _pick_patient_age(row)
-    return {"gender": gender, "anchor_age": age}
-
-
-def build_patient_panel(hadm_id: int) -> dict[str, Any]:
-    """
-    组装 GET /patient 所需结构化数据：概览 + ICU 列表 + 诊断（诊断可委托 diagnosis_service，此处由 API 组合）。
-    本函数仅负责患者/入院/ICU 部分。
-    """
-    adm = get_admissions()
-    if adm.empty or "hadm_id" not in adm.columns:
-        return {"found": False, "hadm_id": hadm_id}
-
-    adm_row = adm.loc[adm["hadm_id"] == hadm_id]
-    if adm_row.empty:
-        return {"found": False, "hadm_id": hadm_id}
-
-    row = adm_row.iloc[0]
-    subject_id = int(row["subject_id"]) if "subject_id" in row.index and pd.notna(row["subject_id"]) else None
-    demo: dict[str, Any] = {"found": True, "hadm_id": hadm_id, "subject_id": subject_id}
-    admittime, dischtime = get_admission_times(hadm_id)
-    demo["admittime"] = admittime.isoformat() if admittime is not None else None
-    demo["dischtime"] = dischtime.isoformat() if dischtime is not None else None
-
-    if subject_id is not None:
-        demo.update(get_patient_demographics(subject_id))
-
-    icu = get_icustays()
-    stays: list[dict[str, Any]] = []
-    if not icu.empty and "hadm_id" in icu.columns:
-        icu_sub = icu.loc[icu["hadm_id"] == hadm_id]
-        for _, ir in icu_sub.iterrows():
-            item: dict[str, Any] = {}
-            if "stay_id" in ir.index and pd.notna(ir["stay_id"]):
-                item["stay_id"] = int(ir["stay_id"])
-            if "intime" in ir.index:
-                t = pd.to_datetime(ir["intime"], errors="coerce")
-                item["intime"] = t.isoformat() if pd.notna(t) else None
-            if "outtime" in ir.index:
-                t = pd.to_datetime(ir["outtime"], errors="coerce")
-                item["outtime"] = t.isoformat() if pd.notna(t) else None
-            if "los" in ir.index and pd.notna(ir["los"]):
-                try:
-                    item["los"] = float(ir["los"])
-                except (TypeError, ValueError):
-                    item["los"] = None
-            else:
-                item["los"] = None
-            stays.append(item)
-    demo["icu_stays"] = stays
-    return demo
+    return {
+        "subject_id": subject_id,
+        "gender": gender,
+        "age": age,
+        "admittime": _scalar_or_none(admittime),
+        "dischtime": _scalar_or_none(dischtime),
+        "icu_intime": _scalar_or_none(icu_intime),
+        "icu_outtime": _scalar_or_none(icu_outtime),
+    }

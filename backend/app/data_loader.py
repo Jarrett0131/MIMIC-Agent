@@ -1,74 +1,72 @@
 """
-数据加载模块：从本地 CSV 读取 MIMIC-IV Demo 各表，并在进程内缓存 DataFrame。
+数据加载：从 data/mimic-demo 下 .csv.gz 读入 pandas DataFrame。
 
-职责：
-- 统一解析路径、读取 CSV
-- 缓存避免重复 IO
-- 不负责业务查询逻辑
-
-【需要根据实际 CSV 列名调整】
-若 CSV 使用不同分隔符或编码，可在此增加 read_csv 参数（sep、encoding）。
-MIMIC 官方通常为逗号分隔 UTF-8。
+仅负责 IO 与缓存实例；业务查询在 services 中实现。
 """
 
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 import pandas as pd
 
 from app.config import settings
 
-if TYPE_CHECKING:
-    pass
 
-
-def _read_csv(path: Path) -> pd.DataFrame:
+def _read_gz_csv(path: Path, **kwargs: Any) -> pd.DataFrame:
     if not path.exists():
+        print(f"[DataLoader] 缺失文件: {path}")
         return pd.DataFrame()
-    # 【需要根据实际 CSV 列名调整】如列名带 BOM，可在此 strip columns
-    df = pd.read_csv(path, low_memory=False)
+    # TODO: 若分隔符/编码非默认，可在此增加 sep、encoding
+    df = pd.read_csv(path, compression="gzip", low_memory=False, **kwargs)
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
 
-@lru_cache(maxsize=1)
-def get_patients() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_patients)
+class DataLoader:
+    """
+    初始化时加载 8 张表；chartevents 可通过 chart_nrows 限制行数以控制内存。
+    """
+
+    def __init__(self, chart_nrows: int | None = 200_000) -> None:
+        root: Path = settings.data_dir
+        hosp = root / "hosp"
+        icu = root / "icu"
+
+        self.patients: pd.DataFrame = _read_gz_csv(hosp / "patients.csv.gz")
+        self._print_shape("patients", self.patients)
+
+        self.admissions: pd.DataFrame = _read_gz_csv(hosp / "admissions.csv.gz")
+        self._print_shape("admissions", self.admissions)
+
+        self.diagnoses_icd: pd.DataFrame = _read_gz_csv(hosp / "diagnoses_icd.csv.gz")
+        self._print_shape("diagnoses_icd", self.diagnoses_icd)
+
+        self.labevents: pd.DataFrame = _read_gz_csv(hosp / "labevents.csv.gz")
+        self._print_shape("labevents", self.labevents)
+
+        self.d_labitems: pd.DataFrame = _read_gz_csv(hosp / "d_labitems.csv.gz")
+        self._print_shape("d_labitems", self.d_labitems)
+
+        self.icustays: pd.DataFrame = _read_gz_csv(icu / "icustays.csv.gz")
+        self._print_shape("icustays", self.icustays)
+
+        chart_kwargs: dict[str, Any] = {}
+        if chart_nrows is not None:
+            chart_kwargs["nrows"] = chart_nrows
+        self.chartevents: pd.DataFrame = _read_gz_csv(
+            icu / "chartevents.csv.gz", **chart_kwargs
+        )
+        self._print_shape("chartevents", self.chartevents)
+
+        self.d_items: pd.DataFrame = _read_gz_csv(icu / "d_items.csv.gz")
+        self._print_shape("d_items", self.d_items)
+
+    @staticmethod
+    def _print_shape(name: str, df: pd.DataFrame) -> None:
+        print(f"[DataLoader] {name}: shape={df.shape}")
 
 
-@lru_cache(maxsize=1)
-def get_admissions() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_admissions)
-
-
-@lru_cache(maxsize=1)
-def get_icustays() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_icustays)
-
-
-@lru_cache(maxsize=1)
-def get_labevents() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_labevents)
-
-
-@lru_cache(maxsize=1)
-def get_chartevents() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_chartevents)
-
-
-@lru_cache(maxsize=1)
-def get_diagnoses_icd() -> pd.DataFrame:
-    return _read_csv(settings.data_dir / settings.file_diagnoses_icd)
-
-
-def clear_cache() -> None:
-    """测试或热重载时可调用以清空缓存（一般不需要）。"""
-    get_patients.cache_clear()
-    get_admissions.cache_clear()
-    get_icustays.cache_clear()
-    get_labevents.cache_clear()
-    get_chartevents.cache_clear()
-    get_diagnoses_icd.cache_clear()
+# 进程内全局单例，供 services / 调试脚本复用
+data_loader = DataLoader()

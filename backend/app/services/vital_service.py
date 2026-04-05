@@ -1,11 +1,5 @@
 """
-生命体征查询：chartevents 表，按 hadm_id + 时间窗 + itemid 过滤。
-
-仅返回结构化记录列表。
-
-【需要根据实际 CSV 列名调整】
-- chartevents 需含 hadm_id, charttime, itemid；部分安装含 stay_id。
-- itemid 需与 d_items 对照；下列为 MIMIC-IV 常见示例，**请用本地数据核对**。
+生命体征：chartevents 左连 d_items，按 label 关键词筛选。
 """
 
 from __future__ import annotations
@@ -14,75 +8,68 @@ from typing import Any
 
 import pandas as pd
 
-from app.data_loader import get_chartevents
-from app.services.patient_service import get_anchor_start_for_hadm
-
-# 【需要根据实际 CSV 列名调整 / 根据 d_items 核对 itemid】
-VITAL_ITEMIDS: dict[str, list[int]] = {
-    "heart_rate": [220045],
-    "nbp_systolic": [220050, 220179],
-    "nbp_diastolic": [220051, 220180],
-    "temperature": [223761, 223762, 678],
-}
+from app.data_loader import data_loader
 
 
-def query_vital_last_24h(hadm_id: int, metric: str) -> list[dict[str, Any]]:
+def _nan_to_none(val: Any) -> Any:
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    if hasattr(val, "isoformat"):
+        try:
+            return val.isoformat()
+        except (TypeError, ValueError):
+            return str(val)
+    return val
+
+
+def get_vitals_by_keyword(
+    hadm_id: int, keyword: str, limit: int = 20
+) -> list[dict[str, Any]]:
     """
-    查询锚点后 24 小时内的生命体征。
-
-    metric: heart_rate | nbp_systolic | nbp_diastolic | temperature
-    血压综合问法在 router/generator 层合并 systolic/diastolic 两次查询。
+    chartevents ⋊ d_items(itemid)，hadm_id 匹配且 label 包含 keyword（大小写不敏感）。
     """
-    itemids = VITAL_ITEMIDS.get(metric, [])
-    if not itemids:
+    ch = data_loader.chartevents
+    dic = data_loader.d_items
+    if ch.empty or dic.empty:
+        return []
+    if "itemid" not in ch.columns or "itemid" not in dic.columns:
+        return []
+    if "hadm_id" not in ch.columns:
         return []
 
-    anchor = get_anchor_start_for_hadm(hadm_id)
-    if anchor is None:
+    # TODO: d_items 中项目名称列可能是 label / abbreviation 等
+    label_col = "label" if "label" in dic.columns else None
+    if label_col is None:
         return []
 
-    window_end = anchor + pd.Timedelta(hours=24)
-    ch = get_chartevents()
-    if ch.empty:
-        return []
-    required = {"hadm_id", "charttime", "itemid"}
-    if not required.issubset(set(ch.columns)):
+    dic_sub = dic[["itemid", label_col]].drop_duplicates(subset=["itemid"], keep="first")
+    merged = ch.merge(dic_sub, on="itemid", how="left")
+    merged = merged.loc[merged["hadm_id"] == hadm_id]
+    if merged.empty:
         return []
 
-    sub = ch.loc[ch["hadm_id"] == hadm_id].copy()
-    if sub.empty:
-        return []
+    labels = merged[label_col].fillna("").astype(str)
+    kw = keyword.lower()
+    mask = labels.str.lower().str.contains(kw, regex=False, na=False)
+    merged = merged.loc[mask].head(limit)
 
-    sub["_charttime"] = pd.to_datetime(sub["charttime"], errors="coerce")
-    sub = sub.dropna(subset=["_charttime"])
-    sub = sub.loc[sub["_charttime"].between(anchor, window_end, inclusive="both")]
-    sub = sub.loc[sub["itemid"].isin(itemids)]
-    sub = sub.sort_values("_charttime", ascending=False)
-
-    cols = [c for c in ("charttime", "stay_id", "itemid", "value", "valuenum", "valueuom") if c in sub.columns]
-    if not cols:
-        cols = [c for c in sub.columns if c != "_charttime"]
-
-    out: list[dict[str, Any]] = []
-    for _, row in sub.iterrows():
+    desired = [
+        "subject_id",
+        "hadm_id",
+        "itemid",
+        "label",
+        "charttime",
+        "valuenum",
+        "valueuom",
+    ]
+    rows: list[dict[str, Any]] = []
+    for _, row in merged.iterrows():
         rec: dict[str, Any] = {}
-        ct = row["_charttime"]
-        rec["charttime"] = ct.isoformat() if pd.notna(ct) else None
-        for c in cols:
-            v = row[c]
-            if pd.isna(v):
+        for c in desired:
+            src = label_col if c == "label" else c
+            if src not in row.index:
                 rec[c] = None
-            elif c == "itemid" or c == "stay_id":
-                try:
-                    rec[c] = int(v)
-                except (TypeError, ValueError):
-                    rec[c] = None
-            elif c == "valuenum" and pd.notna(v):
-                try:
-                    rec[c] = float(v)
-                except (TypeError, ValueError):
-                    rec[c] = str(v)
             else:
-                rec[c] = str(v) if not isinstance(v, (int, float)) else v
-        out.append(rec)
-    return out
+                rec[c] = _nan_to_none(row[src])
+        rows.append(rec)
+    return rows

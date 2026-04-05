@@ -1,17 +1,23 @@
 """
-应用配置：数据目录、表文件名、CORS 等。
+应用配置：项目根目录、MIMIC Demo 数据目录、API/CORS。
 
-【需要根据实际 CSV 列名调整】
-若本地文件名与 MIMIC-IV Demo 发布包不一致，请修改 TABLE_FILES。
+路径均相对本文件解析，不写死机器绝对路径；可通过环境变量 MIMIC_DATA_DIR 覆盖 data_dir。
 """
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 项目根目录：backend/app/config.py -> parents[2] == 仓库根（含 data/、backend/）
+PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
+
+# MIMIC-IV Demo 数据根目录（默认 data/mimic_demo）
+DATA_DIR: Path = PROJECT_ROOT / "data" / "mimic_demo"
 
 
 class Settings(BaseSettings):
-    """从环境变量加载配置，便于本地与演示环境切换。"""
+    """从环境变量加载配置；data_dir 默认 DATA_DIR。"""
 
     model_config = SettingsConfigDict(
         env_prefix="MIMIC_",
@@ -20,19 +26,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # 存放 MIMIC-IV Demo CSV 的根目录（相对 backend 或绝对路径均可）
-    data_dir: Path = Path(__file__).resolve().parent.parent.parent / "data" / "mimic_demo"
+    project_root: Path = Field(default=PROJECT_ROOT)
+    data_dir: Path = Field(default=DATA_DIR)
 
-    # 各表 CSV 文件名（不含路径）
-    # 【需要根据实际 CSV 列名调整】若表名不同，在此改文件名
-    file_patients: str = "patients.csv"
-    file_admissions: str = "admissions.csv"
-    file_icustays: str = "icustays.csv"
-    file_labevents: str = "labevents.csv"
-    file_chartevents: str = "chartevents.csv"
-    file_diagnoses_icd: str = "diagnoses_icd.csv"
-
-    # API
     api_title: str = "MIMIC-IV Demo Clinical Q&A API"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
