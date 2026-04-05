@@ -1,204 +1,175 @@
 """
-回答生成器：基于查询结果使用模板拼接自然语言，并整理 evidence。
-
-约束：
-- 仅使用传入的 records/panel 中的字段，不编造数值或诊断结论。
-- 不提供诊疗建议，仅复述数据事实或说明未查到记录。
-
-扩展点：可将模板函数替换为 LLM 调用，但应对 evidence 做同样约束（只引用查询结果）。
+模板生成回答与证据（不接 LLM）；内容严格来自 route_result.data。
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from app.agent.router import ToolRun
 from app.schemas import AskResponse
 
-LIMITATION_TEXT = (
-    "本输出基于 MIMIC-IV Demo 结构化数据与规则查询，仅供教学演示；"
-    "非临床决策依据，不包含诊断建议或治疗推荐。"
+LIMITATION_OK = (
+    "本输出基于 MIMIC-IV Demo 与规则查询，仅供课程展示，非临床决策依据，不构成诊疗建议。"
 )
+LIMITATION_EMPTY = "当前患者在现有 demo 数据范围内没有匹配结果。"
+LIMITATION_UNSUPPORTED = "仅支持基本信息、诊断、乳酸、肌酐、白细胞、心率、血压相关问题。"
 
 
-def _no_data_answer() -> str:
-    return "未查询到相关记录。"
+def _json_val(v: Any) -> object:
+    if v is None:
+        return None
+    if hasattr(v, "item") and callable(getattr(v, "item", None)):
+        try:
+            out = v.item()
+            return _json_val(out)
+        except (ValueError, TypeError, AttributeError):
+            return str(v)
+    if isinstance(v, (int, float, str, bool)):
+        return v
+    if hasattr(v, "isoformat"):
+        try:
+            return v.isoformat()
+        except (TypeError, ValueError):
+            return str(v)
+    return str(v)
 
 
-def _evidence_from_records(records: list[dict[str, Any]], max_items: int = 80) -> list[dict[str, Any]]:
-    """截断证据条数，避免响应过大。"""
-    return records[:max_items]
+def _json_dict(d: dict[str, Any]) -> dict[str, object]:
+    return {str(k): _json_val(v) for k, v in d.items()}
 
 
-def generate_ask_response(run: ToolRun) -> AskResponse:
-    """根据 ToolRun 生成统一格式的 AskResponse。"""
-    qt = run.question_type
-    evidence = _evidence_from_records(run.records)
+def _as_evidence(data: object, max_items: int = 5) -> list[dict[str, object]]:
+    if isinstance(data, list):
+        out: list[dict[str, object]] = []
+        for item in data[:max_items]:
+            if isinstance(item, dict):
+                out.append(_json_dict(item))
+        return out
+    if isinstance(data, dict) and data:
+        return [_json_dict(data)]
+    return []
 
-    if qt == "unknown":
+
+def generate_answer(
+    hadm_id: int, question_type: str, route_result: dict[str, object]
+) -> AskResponse:
+    tool_called = str(route_result.get("tool_called", "none"))
+    tool_args = route_result.get("tool_args")
+    if not isinstance(tool_args, dict):
+        tool_args_d: dict[str, object] = {"hadm_id": hadm_id}
+    else:
+        tool_args_d = {str(k): _json_val(v) for k, v in tool_args.items()}
+
+    data = route_result.get("data")
+
+    if question_type == "unsupported":
         return AskResponse(
-            question_type="unknown",
-            tool_called=run.tool_called,
-            tool_args=run.tool_args,
-            answer="当前问题无法匹配到已支持的类型（基本信息、诊断、实验室指标、生命体征）。请换一种问法。",
+            question_type=question_type,
+            tool_called=tool_called,
+            tool_args=tool_args_d,
+            answer="当前 demo 暂不支持该类问题。",
             evidence=[],
-            limitation=LIMITATION_TEXT,
+            limitation=LIMITATION_UNSUPPORTED,
         )
 
-    if qt == "overview":
-        panel = run.records[0] if run.records else {}
-        if not panel.get("found"):
-            return AskResponse(
-                question_type="overview",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer=_no_data_answer(),
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        parts: list[str] = [
-            f"住院号 hadm_id={panel.get('hadm_id')}。",
-        ]
-        if panel.get("subject_id") is not None:
-            parts.append(f"患者 subject_id={panel['subject_id']}。")
-        if panel.get("gender"):
-            parts.append(f"性别：{panel['gender']}。")
-        if panel.get("anchor_age") is not None:
-            parts.append(f"年龄（anchor_age）：{panel['anchor_age']}。")
-        if panel.get("admittime"):
-            parts.append(f"入院时间：{panel['admittime']}。")
-        if panel.get("dischtime"):
-            parts.append(f"出院时间：{panel['dischtime']}。")
-        icu = panel.get("icu_stays") or []
-        if icu:
-            parts.append(f"ICU 入住记录数：{len(icu)}。")
+    def empty_resp() -> AskResponse:
+        return AskResponse(
+            question_type=question_type,
+            tool_called=tool_called,
+            tool_args=tool_args_d,
+            answer="未查询到相关记录。",
+            evidence=[],
+            limitation=LIMITATION_EMPTY,
+        )
+
+    if question_type == "overview":
+        if not isinstance(data, dict) or not data:
+            return empty_resp()
+        ov = _json_dict(data)
+        parts: list[str] = []
+        if ov.get("gender") is not None:
+            parts.append(f"性别：{ov['gender']}")
+        if ov.get("age") is not None:
+            parts.append(f"年龄：{ov['age']}")
+        if ov.get("admittime"):
+            parts.append(f"入院时间：{ov['admittime']}")
+        if ov.get("dischtime"):
+            parts.append(f"出院时间：{ov['dischtime']}")
+        if ov.get("icu_intime"):
+            parts.append(f"ICU 入科时间：{ov['icu_intime']}")
+        if ov.get("icu_outtime"):
+            parts.append(f"ICU 出科时间：{ov['icu_outtime']}")
+        if not parts:
+            return empty_resp()
+        answer = "患者基本信息：" + "；".join(parts) + "。"
+        return AskResponse(
+            question_type=question_type,
+            tool_called=tool_called,
+            tool_args=tool_args_d,
+            answer=answer,
+            evidence=[ov],
+            limitation=LIMITATION_OK,
+        )
+
+    if question_type == "diagnosis":
+        if not isinstance(data, list) or len(data) == 0:
+            return empty_resp()
+        rows = [_json_dict(r) for r in data if isinstance(r, dict)]
+        if not rows:
+            return empty_resp()
+        codes: list[str] = []
+        for r in rows[:20]:
+            c = r.get("icd_code")
+            if c is not None:
+                codes.append(str(c))
+        if codes:
+            answer = "该患者当前查询到的诊断记录包括：" + "、".join(codes[:15])
+            if len(codes) > 15:
+                answer += " 等"
+            answer += "。"
         else:
-            parts.append("本次入院未查询到 ICU 入住记录。")
+            # TODO: 若 ICD 列名非 icd_code，codes 可能为空，仅给出条数
+            answer = f"该患者当前查询到 {len(rows)} 条诊断记录，编码字段详见 evidence。"
         return AskResponse(
-            question_type="overview",
-            tool_called=run.tool_called,
-            tool_args=run.tool_args,
-            answer="\n".join(parts),
-            evidence=evidence,
-            limitation=LIMITATION_TEXT,
+            question_type=question_type,
+            tool_called=tool_called,
+            tool_args=tool_args_d,
+            answer=answer,
+            evidence=rows[:5],
+            limitation=LIMITATION_OK,
         )
 
-    if qt == "diagnosis":
-        if not run.records:
-            return AskResponse(
-                question_type="diagnosis",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer=_no_data_answer(),
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        lines: list[str] = ["本次入院查询到的诊断编码列表（按 seq_num 排序，仅陈述编码事实）："]
-        for r in run.records:
-            seq = r.get("seq_num")
-            code = r.get("icd_code")
-            ver = r.get("icd_version")
-            lines.append(f"seq_num={seq}, icd_code={code}, icd_version={ver}。")
+    if question_type in (
+        "lab_lactate",
+        "lab_creatinine",
+        "lab_white",
+        "vital_heart_rate",
+        "vital_blood_pressure",
+    ):
+        if not isinstance(data, list) or len(data) == 0:
+            return empty_resp()
+        rows_ev = _as_evidence(data, 5)
+        r0 = data[0]
+        if not isinstance(r0, dict):
+            return empty_resp()
+        r = _json_dict(r0)
+        label = r.get("label")
+        if label is None or label == "":
+            label = "该项指标"
+        val = r.get("valuenum")
+        if val is None:
+            val = r.get("value")
+        uom = r.get("valueuom")
+        uom_s = f" {uom}" if uom not in (None, "") else ""
+        ct = r.get("charttime")
+        answer = f"最近查询到的 {label} 结果为 {val}{uom_s}，记录时间为 {ct}。"
         return AskResponse(
-            question_type="diagnosis",
-            tool_called=run.tool_called,
-            tool_args=run.tool_args,
-            answer="\n".join(lines),
-            evidence=evidence,
-            limitation=LIMITATION_TEXT,
+            question_type=question_type,
+            tool_called=tool_called,
+            tool_args=tool_args_d,
+            answer=answer,
+            evidence=rows_ev,
+            limitation=LIMITATION_OK,
         )
 
-    if qt == "lab":
-        metric = run.tool_args.get("metric")
-        if metric is None:
-            return AskResponse(
-                question_type="lab",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer="问题属于实验室指标类，但未识别到具体指标（乳酸/白细胞/肌酐）。请包含明确指标名称后重试。",
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        if not run.records:
-            return AskResponse(
-                question_type="lab",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer=_no_data_answer(),
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        label = {"lactate": "乳酸", "wbc": "白细胞", "creatinine": "肌酐"}.get(metric, str(metric))
-        lines = [
-            f"在入院/ICU 锚点时间后 24 小时内，{label}相关实验室记录如下（按时间倒序，仅列查询到的字段）：",
-        ]
-        for r in run.records[:20]:
-            t = r.get("charttime")
-            num = r.get("valuenum")
-            u = r.get("valueuom")
-            raw = r.get("value")
-            lines.append(f"时间 {t}，数值 {num} {u or ''}，原始 value={raw}。")
-        if len(run.records) > 20:
-            lines.append(f"（另有 {len(run.records) - 20} 条未在摘要中逐条展开，见 evidence。）")
-        return AskResponse(
-            question_type="lab",
-            tool_called=run.tool_called,
-            tool_args=run.tool_args,
-            answer="\n".join(lines),
-            evidence=evidence,
-            limitation=LIMITATION_TEXT,
-        )
-
-    if qt == "vital":
-        metric = run.tool_args.get("metric")
-        if metric is None:
-            return AskResponse(
-                question_type="vital",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer="问题属于生命体征类，但未识别到具体项目（心率/血压/体温）。请包含明确项目名称后重试。",
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        if not run.records:
-            return AskResponse(
-                question_type="vital",
-                tool_called=run.tool_called,
-                tool_args=run.tool_args,
-                answer=_no_data_answer(),
-                evidence=[],
-                limitation=LIMITATION_TEXT,
-            )
-        if metric == "blood_pressure":
-            lines = ["在锚点后 24 小时内，血压相关记录（收缩压/舒张压分项，仅陈述测量值）："]
-        elif metric == "heart_rate":
-            lines = ["在锚点后 24 小时内，心率相关记录："]
-        else:
-            lines = ["在锚点后 24 小时内，体温相关记录："]
-        for r in run.records[:20]:
-            t = r.get("charttime")
-            comp = r.get("_vital_component")
-            num = r.get("valuenum")
-            u = r.get("valueuom")
-            raw = r.get("value")
-            prefix = f"[{comp}] " if comp else ""
-            lines.append(f"{prefix}时间 {t}，数值 {num} {u or ''}，原始 value={raw}。")
-        if len(run.records) > 20:
-            lines.append(f"（另有 {len(run.records) - 20} 条未在摘要中逐条展开，见 evidence。）")
-        return AskResponse(
-            question_type="vital",
-            tool_called=run.tool_called,
-            tool_args=run.tool_args,
-            answer="\n".join(lines),
-            evidence=evidence,
-            limitation=LIMITATION_TEXT,
-        )
-
-    return AskResponse(
-        question_type="unknown",
-        tool_called=run.tool_called,
-        tool_args=run.tool_args,
-        answer=_no_data_answer(),
-        evidence=[],
-        limitation=LIMITATION_TEXT,
-    )
+    return empty_resp()
