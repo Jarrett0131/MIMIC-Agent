@@ -1,59 +1,56 @@
-# Clinical Data Agent Demo
+# MIMIC 临床数据智能代理系统
 
-## 1. Official Architecture
+## 项目简介
 
-This repository now uses a single supported architecture:
+MIMIC-Agent 是一个基于 MIMIC-IV 临床数据集的智能问答系统。用户可以通过自然语言查询患者信息、实验室检查结果、诊断记录等临床数据，系统通过多层次的处理流程（包括查询理解、检索增强、LLM 增强等）为用户提供准确的答案并关联相关证据。
 
-```text
-frontend
-  -> agent-server
-      -> data-service
-          -> MIMIC-IV demo CSV
-      -> docs/rag
-      -> optional LLM
+该系统采用前后端分离的架构设计，通过前端、代理服务、数据服务三层协作，确保数据安全、逻辑清晰、易于维护和扩展。
+
+## 技术栈
+
+**前端层**：React + TypeScript + Vite，负责用户界面和交互体验。
+
+**代理层**：Node.js + Express + TypeScript，提供请求路由、查询改写、检索增强、LLM 集成等核心处理逻辑。
+
+**数据层**：Python + FastAPI，作为唯一的临床数据源，负责 MIMIC 数据的加载、查询和 API 暴露。
+
+**检索资源**：结构化的医学知识库和诊断解释，存储在 `docs/rag/` 目录下。
+
+**测试工具**：Vitest（前后端单元测试）、Supertest（API 集成测试）。
+
+## 项目架构
+
+系统采用三层架构设计，数据流向清晰且单向：
+
+```
+前端 (React UI)
+    ↓
+代理服务 (Node.js 编排层)
+    ├→ 数据服务 (Python FastAPI)
+    │   └→ MIMIC 数据集
+    └→ 检索资源库 (docs/rag/)
+        └→ 可选 LLM 增强
 ```
 
-System roles:
+**前端 (frontend/)**：提供患者选择、问答界面、状态管理、证据展示等交互功能。只与代理服务通信。
 
-- `data-service/` is the only clinical data backend and the source of truth for patient data.
-- `agent-server/` is the orchestration and enhancement layer. It handles routing, rewrite, retrieval, answer composition, and streaming responses.
-- `frontend/` is the user interaction layer. It should only talk to `agent-server/`.
+**代理服务 (agent-server/)**：核心编排层，负责请求验证、查询改写、分类路由、RAG 检索、LLM 增强和流式响应。从数据服务获取患者信息，从检索资源获取医学知识。
 
-Legacy note:
+**数据服务 (data-service/)**：唯一的临床数据源，通过 pandas 加载 MIMIC CSV 文件并暴露结构化 API 端点。仅负责数据查询，不涉及 LLM 编排或 RAG 逻辑。
 
-- The old `backend/` Python orchestration service is no longer part of the supported system and has been removed.
+**检索资源 (docs/rag/)**：包含诊断解释、实验室项目说明、医学术语等结构化知识，由代理服务在回答生成时引用。
 
-Architecture contract:
+## 如何部署
 
-- `frontend/` must not call `data-service/` directly.
-- `agent-server/` must not duplicate the data backend role of `data-service/`.
-- `data-service/` must not own LLM orchestration, RAG composition, or chat workflow logic.
-- Clinical data access should be implemented in `data-service/` first, then exposed through `agent-server/`.
-- Knowledge explanations and retrieval assets belong under `docs/rag/` and are consumed by `agent-server/`.
+### 前置要求
 
-For the full development boundary definition, see [docs/architecture.md](docs/architecture.md).
+- Python 3.8 以上版本
+- Node.js 16 以上版本
+- npm 或 yarn
 
-## 2. Project Structure
+### 1. 环境配置
 
-```text
-frontend/       React UI for patient selection, Q&A, state flow, and evidence linking
-agent-server/   Node.js orchestration layer for routing, rewrite, RAG, and streaming responses
-data-service/   Python FastAPI data backend that reads the MIMIC demo data and exposes structured APIs
-docs/rag/       Retrieval corpus and structured knowledge assets used by the agent layer
-scripts/        One-command startup and smoke-test scripts
-evaluation/     Offline evaluation and LLM_ON vs LLM_OFF comparison scripts
-data/           MIMIC demo dataset
-```
-
-Recommended ownership:
-
-- Add or change patient data APIs in `data-service/`.
-- Add or change agent workflows, classification, RAG, and answer composition in `agent-server/`.
-- Add or change UI, state, visual flow, and evidence display in `frontend/`.
-
-## 3. Run The Project
-
-1. Configure `.env`
+复制各模块的示例配置文件：
 
 ```powershell
 Copy-Item data-service/.env.example data-service/.env
@@ -61,42 +58,74 @@ Copy-Item agent-server/.env.example agent-server/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-- `data-service/.env`
-  - `MIMIC_DATA_DIR=../data/mimic_demo`
-- `agent-server/.env`
-  - `PYTHON_SERVICE_URL=http://127.0.0.1:8000`
-  - `LLM_API_KEY=` can be left empty; rewrite and answer enhancement will safely fall back
-- `frontend/.env`
-  - `VITE_AGENT_SERVER_URL=http://127.0.0.1:3001`
+编辑各 `.env` 文件设置必要参数：
 
-2. Start `data-service`
+**data-service/.env** - 数据服务配置
+```
+MIMIC_DATA_DIR=../data/mimic_demo
+```
+
+**agent-server/.env** - 代理服务配置
+```
+PYTHON_SERVICE_URL=http://127.0.0.1:8000
+LLM_API_KEY=your-api-key-here
+```
+
+**frontend/.env** - 前端配置
+```
+VITE_AGENT_SERVER_URL=http://127.0.0.1:3001
+```
+
+### 2. 安装依赖并启动服务
+
+**启动数据服务**（Python FastAPI）
 
 ```powershell
 pip install -r data-service/requirements.txt
 python data-service/run.py
 ```
 
-3. Start `agent-server`
+服务将运行在 `http://127.0.0.1:8000`
+
+**启动代理服务**（Node.js 应用）
 
 ```powershell
 npm --prefix agent-server install
 npm --prefix agent-server run dev
 ```
 
-4. Start `frontend`
+服务将运行在 `http://127.0.0.1:3001`
+
+**启动前端应用**（React 应用）
 
 ```powershell
 npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-Default URLs:
+应用将运行在 `http://localhost:5173`
 
-```text
-data-service  http://127.0.0.1:8000
-agent-server  http://127.0.0.1:3001
-frontend      http://localhost:5173
-```
+### 3. 验证部署
+
+所有服务启动后，打开浏览器访问 `http://localhost:5173`，选择患者并尝试提问。系统应能正确返回患者数据和答案。
+
+## 注意事项
+
+**数据隔离**：前端只能调用代理服务，不能直接访问数据服务或原始数据文件，确保数据安全和统一的业务逻辑控制。
+
+**环境变量**：确保三个服务的环境变量配置正确对应。`LLM_API_KEY` 若未配置，系统会安全降级到无 LLM 增强的模式，继续提供基础查询和检索功能。
+
+**依赖管理**：代理服务和前端使用 npm，数据服务使用 pip。若遇到依赖冲突，建议删除 `node_modules` 或 `venv` 后重新安装。
+
+**检索资源**：`docs/rag/` 下的 JSON 文件包含医学知识库。若需要更新诊断解释或实验室项目说明，请修改对应的 JSON 文件，代理服务无需重启即可生效。
+
+**日志输出**：代理服务和数据服务均提供详细的请求日志。开发时建议在终端中实时观察日志，快速定位问题。
+
+**测试**：运行 `npm test` 执行前后端测试套件。若部分测试失败，请检查环境配置和数据文件完整性。
+
+**性能优化**：MIMIC 数据集较大，初次查询可能需要几秒钟。建议在生产环境中考虑添加数据缓存或索引以加速查询。
+
+详细的架构定义和开发边界说明，请参阅 [docs/architecture.md](docs/architecture.md)。
 
 One-command start:
 
