@@ -16,13 +16,16 @@ node_modules/
 frontend/dist/
 *.local
 
-# 编辑器
+# Editor files
 .idea/
 .vscode/
 *.swp
 .DS_Store
 
-# MIMIC 数据文件通常较大，不上传；保留目录占位
+# Runtime logs
+*.log
+
+# Large MIMIC demo data files
 data/mimic_demo/*.csv
 data/mimic_demo/*.parquet
 data/mimic_demo/*.gz

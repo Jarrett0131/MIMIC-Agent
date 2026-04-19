@@ -1,11 +1,40 @@
-import { requestJson } from "./client";
-import type { PatientOverviewResponse } from "../types";
+import { appConfig } from "../config/app";
+import type { PatientIdListResponse, PatientOverviewResponse } from "../types";
+import { buildConnectionError, isAbortError, parseJsonResponse } from "./http";
 
-/**
- * GET /patient/{hadm_id}
- */
-export function fetchPatientOverview(
-  hadm_id: number
-): Promise<PatientOverviewResponse> {
-  return requestJson<PatientOverviewResponse>(`/patient/${hadm_id}`);
+export async function fetchPatient(hadmId: number): Promise<PatientOverviewResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${appConfig.agentServerUrl}/patient/${hadmId}`, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+  } catch {
+    throw buildConnectionError();
+  }
+
+  return parseJsonResponse<PatientOverviewResponse>(response);
+}
+
+export async function fetchPatientIds(signal?: AbortSignal): Promise<PatientIdListResponse> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${appConfig.agentServerUrl}/patients/ids`, {
+      headers: {
+        Accept: "application/json",
+      },
+      signal,
+    });
+  } catch (error: unknown) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+
+    throw buildConnectionError();
+  }
+
+  return parseJsonResponse<PatientIdListResponse>(response);
 }

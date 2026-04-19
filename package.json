@@ -1,0 +1,9 @@
+{
+  "name": "agent-demo-workspace",
+  "private": true,
+  "scripts": {
+    "test": "npm run test:agent && npm run test:frontend",
+    "test:agent": "npm --prefix agent-server run test",
+    "test:frontend": "npm --prefix frontend run test"
+  }
+}

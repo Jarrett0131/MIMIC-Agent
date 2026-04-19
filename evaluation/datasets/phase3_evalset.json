@@ -1,0 +1,465 @@
+{
+  "version": "phase3.v1",
+  "default_hadm_id": 20626031,
+  "samples": [
+    {
+      "id": "structured_patient_001",
+      "category": "structured",
+      "language": "zh",
+      "question": "这个患者的基本信息是什么？",
+      "hadm_id": 20626031,
+      "expected_route": "patient_info",
+      "expected_tool": "fetchPatient",
+      "expected_keywords": ["gender", "age", "ICU"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_patient_002",
+      "category": "structured",
+      "language": "zh",
+      "question": "这个患者的住院信息和 ICU 时间是什么？",
+      "hadm_id": 20626031,
+      "expected_route": "patient_info",
+      "expected_tool": "fetchPatient",
+      "expected_keywords": ["admittime", "dischtime", "icu"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_patient_003",
+      "category": "structured",
+      "language": "en",
+      "question": "patient overview for this admission",
+      "hadm_id": 20626031,
+      "expected_route": "patient_info",
+      "expected_tool": "fetchPatient",
+      "expected_keywords": ["patient", "age", "gender"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_lab_001",
+      "category": "structured",
+      "language": "zh",
+      "question": "最近的血糖情况如何？",
+      "hadm_id": 20626031,
+      "expected_route": "lab_query",
+      "expected_tool": "fetchRecentLabs",
+      "expected_keywords": ["glucose", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_lab_002",
+      "category": "structured",
+      "language": "en",
+      "question": "latest glucose lab result",
+      "hadm_id": 20626031,
+      "expected_route": "lab_query",
+      "expected_tool": "fetchRecentLabs",
+      "expected_keywords": ["glucose", "value", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_lab_003",
+      "category": "structured",
+      "language": "zh",
+      "question": "最近的白细胞结果是什么？",
+      "hadm_id": 20297618,
+      "expected_route": "lab_query",
+      "expected_tool": "fetchRecentLabs",
+      "expected_keywords": ["WBC", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_lab_004",
+      "category": "structured",
+      "language": "en",
+      "question": "latest creatinine lab result",
+      "hadm_id": 20297618,
+      "expected_route": "lab_query",
+      "expected_tool": "fetchRecentLabs",
+      "expected_keywords": ["creatinine", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_vital_001",
+      "category": "structured",
+      "language": "zh",
+      "question": "最近的心率是多少？",
+      "hadm_id": 20626031,
+      "expected_route": "vital_query",
+      "expected_tool": "fetchRecentVitals",
+      "expected_keywords": ["heart rate", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_vital_002",
+      "category": "structured",
+      "language": "en",
+      "question": "latest pulse reading",
+      "hadm_id": 20626031,
+      "expected_route": "vital_query",
+      "expected_tool": "fetchRecentVitals",
+      "expected_keywords": ["heart rate", "bpm"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_vital_003",
+      "category": "structured",
+      "language": "zh",
+      "question": "最近的血压情况如何？",
+      "hadm_id": 20297618,
+      "expected_route": "vital_query",
+      "expected_tool": "fetchRecentVitals",
+      "expected_keywords": ["blood pressure", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_dx_001",
+      "category": "structured",
+      "language": "zh",
+      "question": "诊断结果是什么？",
+      "hadm_id": 20626031,
+      "expected_route": "diagnosis_query",
+      "expected_tool": "fetchDiagnoses",
+      "expected_keywords": ["icd", "diagnosis"],
+      "requires_evidence": true
+    },
+    {
+      "id": "structured_dx_002",
+      "category": "structured",
+      "language": "en",
+      "question": "what are the diagnoses for this patient?",
+      "hadm_id": 20297618,
+      "expected_route": "diagnosis_query",
+      "expected_tool": "fetchDiagnoses",
+      "expected_keywords": ["ICD", "long_title"],
+      "requires_evidence": true
+    },
+    {
+      "id": "rag_metric_001",
+      "category": "rag",
+      "language": "mixed",
+      "question": "WBC 是什么意思？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["WBC"],
+      "expected_keywords": ["白细胞", "感染", "炎症"]
+    },
+    {
+      "id": "rag_metric_002",
+      "category": "rag",
+      "language": "zh",
+      "question": "白细胞是什么意思？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["WBC"],
+      "expected_keywords": ["white blood cell", "感染", "免疫"]
+    },
+    {
+      "id": "rag_metric_003",
+      "category": "rag",
+      "language": "en",
+      "question": "what does white blood cell mean?",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["WBC"],
+      "expected_keywords": ["white blood cell", "infection", "inflammation"]
+    },
+    {
+      "id": "rag_metric_004",
+      "category": "rag",
+      "language": "zh",
+      "question": "血糖指标代表什么？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Glucose"],
+      "expected_keywords": ["血糖", "代谢", "glucose"]
+    },
+    {
+      "id": "rag_metric_005",
+      "category": "rag",
+      "language": "en",
+      "question": "what does blood sugar mean?",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Glucose"],
+      "expected_keywords": ["glucose", "blood sugar", "metabolism"]
+    },
+    {
+      "id": "rag_metric_006",
+      "category": "rag",
+      "language": "mixed",
+      "question": "Hemoglobin 是什么？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Hemoglobin"],
+      "expected_keywords": ["血红蛋白", "贫血", "携氧"]
+    },
+    {
+      "id": "rag_metric_007",
+      "category": "rag",
+      "language": "zh",
+      "question": "心率指标代表什么？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Heart Rate"],
+      "expected_keywords": ["心率", "bpm", "生命体征"]
+    },
+    {
+      "id": "rag_metric_008",
+      "category": "rag",
+      "language": "en",
+      "question": "what does pulse measure?",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Heart Rate"],
+      "expected_keywords": ["pulse", "heart rate", "bpm"]
+    },
+    {
+      "id": "rag_metric_009",
+      "category": "rag",
+      "language": "zh",
+      "question": "血压这个指标是什么意思？",
+      "expected_route": "metric_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Blood Pressure"],
+      "expected_keywords": ["血压", "收缩压", "舒张压"]
+    },
+    {
+      "id": "rag_field_001",
+      "category": "rag",
+      "language": "mixed",
+      "question": "charttime 是什么字段？",
+      "expected_route": "field_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["charttime"],
+      "expected_keywords": ["记录时间", "观察时间", "字段"]
+    },
+    {
+      "id": "rag_field_002",
+      "category": "rag",
+      "language": "en",
+      "question": "what is charttime field?",
+      "expected_route": "field_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["charttime"],
+      "expected_keywords": ["recorded time", "field", "time"]
+    },
+    {
+      "id": "rag_field_003",
+      "category": "rag",
+      "language": "mixed",
+      "question": "hadm_id 是什么意思？",
+      "expected_route": "field_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["hadm_id"],
+      "expected_keywords": ["hospital admission id", "住院号", "字段"]
+    },
+    {
+      "id": "rag_field_004",
+      "category": "rag",
+      "language": "en",
+      "question": "what is hospital admission id?",
+      "expected_route": "field_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["hadm_id"],
+      "expected_keywords": ["hadm_id", "admission id", "identifier"]
+    },
+    {
+      "id": "rag_term_001",
+      "category": "rag",
+      "language": "mixed",
+      "question": "Sepsis 是什么意思？",
+      "expected_route": "term_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Sepsis"],
+      "expected_keywords": ["脓毒症", "感染", "器官功能"]
+    },
+    {
+      "id": "rag_term_002",
+      "category": "rag",
+      "language": "en",
+      "question": "what does pneumonia mean?",
+      "expected_route": "term_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Pneumonia"],
+      "expected_keywords": ["pneumonia", "lung", "infection"]
+    },
+    {
+      "id": "rag_term_003",
+      "category": "rag",
+      "language": "mixed",
+      "question": "AKI 是什么意思？",
+      "expected_route": "term_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Acute Kidney Injury"],
+      "expected_keywords": ["AKI", "急性肾损伤", "肌酐"]
+    },
+    {
+      "id": "rag_term_004",
+      "category": "rag",
+      "language": "zh",
+      "question": "急性肾损伤是什么意思？",
+      "expected_route": "term_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_titles": ["Acute Kidney Injury"],
+      "expected_keywords": ["AKI", "肾功能", "肌酐"]
+    },
+    {
+      "id": "followup_001",
+      "category": "follow_up",
+      "language": "zh",
+      "question": "那心率呢？",
+      "hadm_id": 20626031,
+      "context": {
+        "hadm_id": 20626031,
+        "last_question_type": "lab_query"
+      },
+      "expected_route": "vital_query",
+      "expected_tool": "fetchRecentVitals",
+      "expected_rewrite": {
+        "trigger": true,
+        "changed": true,
+        "rewritten_contains": ["心率"]
+      },
+      "expected_keywords": ["heart rate", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_002",
+      "category": "follow_up",
+      "language": "en",
+      "question": "What about glucose?",
+      "hadm_id": 20626031,
+      "context": {
+        "hadm_id": 20626031,
+        "last_question_type": "vital_query"
+      },
+      "expected_route": "lab_query",
+      "expected_tool": "fetchRecentLabs",
+      "expected_rewrite": {
+        "trigger": false,
+        "changed": false
+      },
+      "expected_keywords": ["glucose", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_003",
+      "category": "follow_up",
+      "language": "zh",
+      "question": "诊断呢？",
+      "hadm_id": 20626031,
+      "context": {
+        "hadm_id": 20626031,
+        "last_question_type": "patient_info"
+      },
+      "expected_route": "diagnosis_query",
+      "expected_tool": "fetchDiagnoses",
+      "expected_rewrite": {
+        "trigger": true,
+        "changed": true,
+        "rewritten_contains": ["诊断"]
+      },
+      "expected_keywords": ["ICD", "diagnosis"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_004",
+      "category": "follow_up",
+      "language": "zh",
+      "question": "这个指标是什么意思？",
+      "hadm_id": 20626031,
+      "context": {
+        "hadm_id": 20626031,
+        "last_question_type": "lab_query"
+      },
+      "expected_route": "knowledge_query",
+      "expected_tool": "retrieveKnowledge",
+      "expected_rewrite": {
+        "trigger": true,
+        "changed": true
+      },
+      "expected_keywords": ["解释", "指标"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_005",
+      "category": "follow_up",
+      "language": "zh",
+      "question": "这个字段呢？",
+      "hadm_id": 20626031,
+      "context": {
+        "hadm_id": 20626031,
+        "last_question_type": "patient_info"
+      },
+      "expected_route": "field_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_rewrite": {
+        "trigger": true,
+        "changed": true,
+        "rewritten_contains": ["字段"]
+      },
+      "expected_keywords": ["field", "字段"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_006",
+      "category": "follow_up",
+      "language": "en",
+      "question": "And patient info?",
+      "hadm_id": 20297618,
+      "context": {
+        "hadm_id": 20297618,
+        "last_question_type": "diagnosis_query"
+      },
+      "expected_route": "patient_info",
+      "expected_tool": "fetchPatient",
+      "expected_rewrite": {
+        "trigger": true,
+        "changed": true,
+        "rewritten_contains": ["patient"]
+      },
+      "expected_keywords": ["patient", "gender", "age"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_007",
+      "category": "follow_up",
+      "language": "en",
+      "question": "What about blood pressure?",
+      "hadm_id": 20297618,
+      "context": {
+        "hadm_id": 20297618,
+        "last_question_type": "lab_query"
+      },
+      "expected_route": "vital_query",
+      "expected_tool": "fetchRecentVitals",
+      "expected_rewrite": {
+        "trigger": false,
+        "changed": false
+      },
+      "expected_keywords": ["blood pressure", "charttime"],
+      "requires_evidence": true
+    },
+    {
+      "id": "followup_008",
+      "category": "follow_up",
+      "language": "en",
+      "question": "And what does AKI mean?",
+      "hadm_id": 20297618,
+      "context": {
+        "hadm_id": 20297618,
+        "last_question_type": "diagnosis_query"
+      },
+      "expected_route": "term_explanation",
+      "expected_tool": "retrieveKnowledge",
+      "expected_rewrite": {
+        "trigger": false,
+        "changed": false
+      },
+      "expected_titles": ["Acute Kidney Injury"],
+      "expected_keywords": ["AKI", "kidney", "creatinine"],
+      "requires_evidence": true
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "field-hadm-id",
+    "title": "hadm_id",
+    "source": "docs/rag/mimic_field_dictionary.json",
+    "content": "hadm_id 是 hospital admission ID，表示一次住院就诊事件的唯一标识。它通常用于把同一次住院相关的患者概况、诊断、化验和生命体征记录关联起来。",
+    "category": "field",
+    "domain": "patient",
+    "aliases": ["hadm_id", "hadm id", "hospital admission id", "hospitalization admission id", "住院号", "住院号字段"],
+    "keywords": ["hadm_id", "admission id", "hospital admission id", "住院号", "住院标识", "字段"]
+  },
+  {
+    "id": "field-charttime",
+    "title": "charttime",
+    "source": "docs/rag/mimic_field_dictionary.json",
+    "content": "charttime 通常表示一条临床记录被记录或观测到的时间点。它常出现在化验和生命体征数据里，用来标记结果对应的具体时间，便于判断最新结果和时间顺序。",
+    "category": "field",
+    "domain": "patient",
+    "aliases": ["charttime", "chart time", "记录时间", "图表时间", "观测时间"],
+    "keywords": ["charttime", "chart time", "记录时间", "图表时间", "时间字段", "字段"]
+  }
+]

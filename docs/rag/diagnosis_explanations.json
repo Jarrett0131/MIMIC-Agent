@@ -1,0 +1,32 @@
+[
+  {
+    "id": "dx-sepsis",
+    "title": "Sepsis",
+    "source": "docs/rag/diagnosis_explanations.json",
+    "content": "Sepsis 通常指脓毒症，表示感染引起的全身性失调反应，并已经对器官功能或循环状态造成风险。临床上常需要结合感染灶、血流动力学变化、器官功能指标和治疗反应一起评估。",
+    "category": "diagnosis",
+    "domain": "diagnosis",
+    "aliases": ["sepsis", "脓毒症", "败血症"],
+    "keywords": ["sepsis", "脓毒症", "败血症", "感染", "器官功能"]
+  },
+  {
+    "id": "dx-pneumonia",
+    "title": "Pneumonia",
+    "source": "docs/rag/diagnosis_explanations.json",
+    "content": "Pneumonia 指肺炎，通常表示肺部发生感染或炎症改变。它的严重程度需要结合病原、影像学、氧合情况、生命体征和患者基础疾病一起判断。",
+    "category": "diagnosis",
+    "domain": "diagnosis",
+    "aliases": ["pneumonia", "肺炎"],
+    "keywords": ["pneumonia", "肺炎", "肺部感染", "影像学", "氧合"]
+  },
+  {
+    "id": "dx-aki",
+    "title": "Acute Kidney Injury",
+    "source": "docs/rag/diagnosis_explanations.json",
+    "content": "Acute Kidney Injury 常缩写为 AKI，表示急性肾损伤。它提示肾功能在较短时间内下降，常需要结合肌酐、尿量、容量状态、感染、药物和灌注情况综合评估。",
+    "category": "diagnosis",
+    "domain": "diagnosis",
+    "aliases": ["acute kidney injury", "AKI", "急性肾损伤"],
+    "keywords": ["acute kidney injury", "aki", "急性肾损伤", "肌酐", "尿量"]
+  }
+]

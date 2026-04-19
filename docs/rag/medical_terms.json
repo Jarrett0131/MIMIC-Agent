@@ -1,0 +1,32 @@
+[
+  {
+    "id": "vital-heart-rate",
+    "title": "Heart Rate",
+    "source": "docs/rag/medical_terms.json",
+    "content": "Heart rate 指心率，表示单位时间内心脏跳动的次数，通常用 bpm 表示。它是最基础的生命体征之一，可反映循环状态、疼痛、发热、脱水、药物影响或心律异常等情况。",
+    "category": "metric",
+    "domain": "vital",
+    "aliases": ["heart rate", "HR", "pulse", "心率", "脉搏"],
+    "keywords": ["heart rate", "hr", "pulse", "心率", "脉搏", "生命体征", "bpm"]
+  },
+  {
+    "id": "vital-blood-pressure",
+    "title": "Blood Pressure",
+    "source": "docs/rag/medical_terms.json",
+    "content": "Blood pressure 指血压，通常分为收缩压和舒张压，用于评估循环灌注和血流动力学状态。异常升高或降低都需要结合症状、用药、液体状态和整体病情一起判断。",
+    "category": "metric",
+    "domain": "vital",
+    "aliases": ["blood pressure", "BP", "血压", "收缩压", "舒张压"],
+    "keywords": ["blood pressure", "bp", "血压", "收缩压", "舒张压", "生命体征"]
+  },
+  {
+    "id": "vital-temperature",
+    "title": "Temperature",
+    "source": "docs/rag/medical_terms.json",
+    "content": "Temperature 指体温，是观察感染、炎症反应和体温调节状态的重要生命体征。发热、低体温或波动明显都需要结合感染证据、环境因素和治疗过程综合判断。",
+    "category": "metric",
+    "domain": "vital",
+    "aliases": ["temperature", "body temperature", "体温"],
+    "keywords": ["temperature", "body temperature", "体温", "发热", "低体温", "生命体征"]
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "lab-glucose",
+    "title": "Glucose",
+    "source": "docs/rag/lab_item_explanations.json",
+    "content": "Glucose 通常指血糖或葡萄糖检测结果，用于观察患者当前的糖代谢状态。数值偏高常见于应激反应、糖尿病或糖代谢异常，数值偏低则提示低血糖风险，需要结合采样时间和临床背景一起判断。",
+    "category": "metric",
+    "domain": "lab",
+    "aliases": ["glucose", "blood glucose", "blood sugar", "血糖", "葡萄糖"],
+    "keywords": ["glucose", "blood glucose", "blood sugar", "血糖", "葡萄糖", "糖代谢", "lab"]
+  },
+  {
+    "id": "lab-wbc",
+    "title": "WBC",
+    "source": "docs/rag/lab_item_explanations.json",
+    "content": "WBC 是 white blood cell 的缩写，表示白细胞计数。它常用于辅助判断感染、炎症反应、骨髓功能或免疫状态，升高和降低都需要结合患者病情与其他化验结果一起解读。",
+    "category": "metric",
+    "domain": "lab",
+    "aliases": ["WBC", "white blood cell", "white blood cell count", "白细胞", "白细胞计数"],
+    "keywords": ["wbc", "white blood cell", "white blood cell count", "白细胞", "感染", "炎症", "lab"]
+  },
+  {
+    "id": "lab-hemoglobin",
+    "title": "Hemoglobin",
+    "source": "docs/rag/lab_item_explanations.json",
+    "content": "Hemoglobin 指血红蛋白，是红细胞中负责携带氧气的重要成分。它常用于评估贫血、失血、慢性疾病影响以及整体携氧能力，需要结合红细胞计数、血细胞比容等指标一起看。",
+    "category": "metric",
+    "domain": "lab",
+    "aliases": ["hemoglobin", "haemoglobin", "Hb", "血红蛋白"],
+    "keywords": ["hemoglobin", "haemoglobin", "hb", "血红蛋白", "贫血", "携氧", "lab"]
+  }
+]
