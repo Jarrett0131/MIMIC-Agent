@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { AnswerEvidenceLink } from "../types";
 
 type LinkedAnswerProps = {
@@ -30,7 +30,10 @@ export const LinkedAnswer = memo(function LinkedAnswer({
   onSelectLink,
   isStreaming,
 }: LinkedAnswerProps) {
-  const normalizedLinks = normalizeLinks(answer, links);
+  const normalizedLinks = useMemo(
+    () => normalizeLinks(answer, links),
+    [answer, links],
+  );
 
   if (!answer) {
     return (

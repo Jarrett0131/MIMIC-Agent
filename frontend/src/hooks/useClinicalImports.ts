@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   deleteClinicalImport,
@@ -109,7 +109,7 @@ export function useClinicalImports({
     };
   }, []);
 
-  async function refreshImportHistory() {
+  const refreshImportHistory = useCallback(async () => {
     setImportState((current) => ({
       ...current,
       historyLoading: true,
@@ -130,9 +130,9 @@ export function useClinicalImports({
         error: error instanceof Error ? error.message : "刷新导入历史失败。",
       }));
     }
-  }
+  }, []);
 
-  async function handleImportClinicalData(options: ImportSubmission) {
+  const handleImportClinicalData = useCallback(async (options: ImportSubmission) => {
     let summary: ClinicalDataImportResponse;
 
     setImportState((current) => ({
@@ -201,9 +201,9 @@ export function useClinicalImports({
         error: error instanceof Error ? error.message : "导入外部数据失败。",
       }));
     }
-  }
+  }, [onPatientOptionsChanged, onSelectPatient, refreshImportHistory]);
 
-  async function handleDeleteImport(importId: string) {
+  const handleDeleteImport = useCallback(async (importId: string) => {
     setImportState((current) => ({
       ...current,
       deletingImportId: importId,
@@ -236,12 +236,20 @@ export function useClinicalImports({
         error: error instanceof Error ? error.message : "删除导入数据失败。",
       }));
     }
-  }
+  }, [currentHadmId, onPatientOptionsChanged, onSelectPatient, refreshImportHistory]);
 
-  return {
-    importState,
-    refreshImportHistory,
-    handleImportClinicalData,
-    handleDeleteImport,
-  };
+  return useMemo(
+    () => ({
+      importState,
+      refreshImportHistory,
+      handleImportClinicalData,
+      handleDeleteImport,
+    }),
+    [
+      handleDeleteImport,
+      handleImportClinicalData,
+      importState,
+      refreshImportHistory,
+    ],
+  );
 }

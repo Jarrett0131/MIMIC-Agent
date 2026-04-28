@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { ChatPanel } from "./components/ChatPanel";
 import { DashboardHeader } from "./components/DashboardHeader";
@@ -59,7 +59,8 @@ export default function App() {
     patientOptionsError,
     reloadPatientOptions,
   } = usePatientOptions();
-  const { debugRequests } = useDebugRequests();
+  const debugApi = useDebugRequests();
+  const { debugRequests } = debugApi;
   const [activeCanvasTab, setActiveCanvasTab] = useState<DataCanvasTab>("vitals");
   const [hoveredAnswerLink, setHoveredAnswerLink] = useState<AnswerEvidenceLink | null>(null);
   const [selectedAnswerLink, setSelectedAnswerLink] = useState<AnswerEvidenceLink | null>(null);
@@ -67,17 +68,16 @@ export default function App() {
   const importPanelRef = useRef<HTMLDivElement | null>(null);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
 
-  // 使用封装的 hooks
   const { loadPatientByValue, selectPatientAndSyncInput } = usePatientLoader(dispatch);
-  const { handleAskQuestion, handleCancelAsk } = useAskSession(dispatch);
+  const { submitQuestion, handleCancelAsk } = useAskSession(dispatch, debugApi);
 
-  function closeImportPanel() {
+  const closeImportPanel = useCallback(() => {
     setIsImportPanelOpen(false);
-  }
+  }, []);
 
-  function toggleImportPanel() {
+  const toggleImportPanel = useCallback(() => {
     setIsImportPanelOpen((open) => !open);
-  }
+  }, []);
 
   useEffect(() => {
     if (!isImportPanelOpen) {
@@ -148,10 +148,14 @@ export default function App() {
     };
   }, [isImportPanelOpen]);
 
-  useEffect(() => {
+  const resetLinkState = useCallback(() => {
     setHoveredAnswerLink(null);
     setSelectedAnswerLink(null);
-  }, [state.askResult?.answer, state.askResult?.question_type]);
+  }, []);
+
+  useEffect(() => {
+    resetLinkState();
+  }, [resetLinkState, state.askResult?.answer, state.askResult?.question_type]);
 
   const {
     importState,
@@ -164,33 +168,80 @@ export default function App() {
     onSelectPatient: selectPatientAndSyncInput,
   });
 
-  async function handleLoadPatient() {
-    await loadPatientByValue(state.hadmIdInput, {
+  const patientLoadUiActions = useMemo(
+    () => ({
       setActiveCanvasTab,
       setHoveredAnswerLink,
       setSelectedAnswerLink,
-    });
-  }
+    }),
+    [],
+  );
 
-  function handleSelectPatientOption(hadmIdValue: string) {
+  const handleHadmIdInputChange = useCallback((value: string) => {
+    dispatch({
+      type: "SET_HADM_ID_INPUT",
+      payload: value,
+    });
+  }, []);
+
+  const handleQuestionChange = useCallback((value: string) => {
+    dispatch({
+      type: "SET_QUESTION",
+      payload: value,
+    });
+  }, []);
+
+  const handleLoadPatient = useCallback(async () => {
+    await loadPatientByValue(state.hadmIdInput, patientLoadUiActions);
+  }, [loadPatientByValue, patientLoadUiActions, state.hadmIdInput]);
+
+  const handleSelectPatientOption = useCallback((hadmIdValue: string) => {
     dispatch({
       type: "SET_HADM_ID_INPUT",
       payload: hadmIdValue,
     });
-    void loadPatientByValue(hadmIdValue, {
-      setActiveCanvasTab,
-      setHoveredAnswerLink,
-      setSelectedAnswerLink,
-    });
-  }
+    void loadPatientByValue(hadmIdValue, patientLoadUiActions);
+  }, [loadPatientByValue, patientLoadUiActions]);
 
-  const activeAnswerLink = hoveredAnswerLink ?? selectedAnswerLink;
-  const lastSubmittedQuestion =
-    state.chatHistory[state.chatHistory.length - 1]?.question ?? "";
-  const linkedFocusEvidence =
-    activeAnswerLink && state.askResult
-      ? state.askResult.evidence[activeAnswerLink.evidence_index] ?? null
-      : null;
+  const handleAnswerLinkHover = useCallback((link: AnswerEvidenceLink | null) => {
+    setHoveredAnswerLink(link);
+  }, []);
+
+  const handleAnswerLinkSelect = useCallback((link: AnswerEvidenceLink) => {
+    setSelectedAnswerLink((currentLink) =>
+      currentLink?.id === link.id ? null : link,
+    );
+  }, []);
+
+  const handleSubmitQuestion = useCallback(
+    () =>
+      submitQuestion({
+        hadmId: state.currentHadmId,
+        question: state.question,
+        context: state.context,
+      }),
+    [submitQuestion, state.context, state.currentHadmId, state.question],
+  );
+
+  const activeAnswerLink = useMemo(
+    () => hoveredAnswerLink ?? selectedAnswerLink,
+    [hoveredAnswerLink, selectedAnswerLink],
+  );
+  const lastSubmittedQuestion = useMemo(
+    () => state.chatHistory[state.chatHistory.length - 1]?.question ?? "",
+    [state.chatHistory],
+  );
+  const linkedFocusEvidence = useMemo(
+    () =>
+      activeAnswerLink && state.askResult
+        ? state.askResult.evidence[activeAnswerLink.evidence_index] ?? null
+        : null,
+    [activeAnswerLink, state.askResult],
+  );
+  const interactionEvidence = useMemo(
+    () => state.askResult?.evidence ?? [],
+    [state.askResult],
+  );
 
   return (
     <div className="app-shell">
@@ -205,12 +256,7 @@ export default function App() {
         patientOptionsTotal={patientOptionsTotal}
         patientOptionsLoading={patientOptionsLoading}
         patientOptionsError={patientOptionsError}
-        onHadmIdInputChange={(value) =>
-          dispatch({
-            type: "SET_HADM_ID_INPUT",
-            payload: value,
-          })
-        }
+        onHadmIdInputChange={handleHadmIdInputChange}
         onLoadPatient={handleLoadPatient}
         onSelectPatientOption={handleSelectPatientOption}
         onReloadPatientOptions={reloadPatientOptions}
@@ -229,7 +275,7 @@ export default function App() {
           activeTab={activeCanvasTab}
           onTabChange={setActiveCanvasTab}
           focusEvidence={linkedFocusEvidence}
-          interactionEvidence={state.askResult?.evidence ?? []}
+          interactionEvidence={interactionEvidence}
         />
 
         <div className="sidebar-column">
@@ -244,21 +290,10 @@ export default function App() {
             conversationContext={state.context}
             chatHistory={state.chatHistory}
             activeAnswerLinkId={activeAnswerLink?.id ?? null}
-            onQuestionChange={(value) =>
-              dispatch({
-                type: "SET_QUESTION",
-                payload: value,
-              })
-            }
-            onAnswerLinkHover={(link) => {
-              setHoveredAnswerLink(link);
-            }}
-            onAnswerLinkSelect={(link) => {
-              setSelectedAnswerLink((currentLink) =>
-                currentLink?.id === link.id ? null : link,
-              );
-            }}
-            onSubmit={() => handleAskQuestion(state.question, state.context, state)}
+            onQuestionChange={handleQuestionChange}
+            onAnswerLinkHover={handleAnswerLinkHover}
+            onAnswerLinkSelect={handleAnswerLinkSelect}
+            onSubmit={handleSubmitQuestion}
             onCancelAsk={handleCancelAsk}
             onToggleImportPanel={toggleImportPanel}
             isImportPanelOpen={isImportPanelOpen}

@@ -5,7 +5,17 @@ import { describe, expect, it, vi } from "vitest";
 import App from "../src/App";
 
 vi.mock("../src/components/ChatPanel", () => ({
-  ChatPanel: () => <div data-testid="chat-panel" />,
+  ChatPanel: ({
+    onToggleImportPanel,
+  }: {
+    onToggleImportPanel?: () => void;
+  }) => (
+    <div data-testid="chat-panel">
+      <button type="button" onClick={onToggleImportPanel}>
+        导入外部数据
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../src/components/DashboardHeader", () => ({

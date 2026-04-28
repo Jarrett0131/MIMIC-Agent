@@ -625,10 +625,11 @@ code,
 }
 
 .interaction-scroll-region {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding-right: 4px;
   align-content: start;
   scrollbar-gutter: stable;
@@ -914,14 +915,18 @@ code,
 }
 
 .chat-stream {
-  display: grid;
-  gap: 12px;
+  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
-.chat-turn {
+.chat-message-virtual-row {
   display: grid;
   gap: 12px;
+}
+
+.chat-message-virtual-row {
+  padding-bottom: 12px;
 }
 
 .chat-message {
@@ -1343,10 +1348,13 @@ code,
     height: auto;
   }
 
+  .interaction-card .app-card-body {
+    grid-template-rows: minmax(320px, 58vh) auto;
+  }
+
   .canvas-summary-card .app-card-body,
   .canvas-data-card .app-card-body,
-  .import-card .app-card-body,
-  .interaction-scroll-region {
+  .import-card .app-card-body {
     overflow: visible;
   }
 }

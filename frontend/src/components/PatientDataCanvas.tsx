@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 
 import type {
   EvidenceItem,
@@ -380,7 +380,7 @@ function scrollTargetIntoCard(target: HTMLElement | null, fallback: HTMLElement 
   });
 }
 
-export function PatientDataCanvas({
+export const PatientDataCanvas = memo(function PatientDataCanvas({
   currentHadmId,
   patientData,
   patientLoading,
@@ -456,33 +456,54 @@ export function PatientDataCanvas({
     };
   }, [activeTab, focusTarget.anchorKey, focusTarget.key, mergedLabs, mergedVitals, patientData]);
 
-  const latestHeartRate = mergedVitals.find((record) => isHeartRateLabel(record.label));
-  const latestBloodPressure = mergedVitals.find((record) => !isHeartRateLabel(record.label));
-  const abnormalLabCount = mergedLabs.filter((record) => Boolean(record.flag?.trim())).length;
+  const latestHeartRate = useMemo(
+    () => mergedVitals.find((record) => isHeartRateLabel(record.label)),
+    [mergedVitals],
+  );
+  const latestBloodPressure = useMemo(
+    () => mergedVitals.find((record) => !isHeartRateLabel(record.label)),
+    [mergedVitals],
+  );
+  const abnormalLabCount = useMemo(
+    () => mergedLabs.filter((record) => Boolean(record.flag?.trim())).length,
+    [mergedLabs],
+  );
 
-  const chartValues = visibleTimeline.flatMap((point) =>
-    [point.heartRate, point.bloodPressure].filter(
-      (value): value is number => typeof value === "number" && Number.isFinite(value),
-    ),
+  const chartValues = useMemo(
+    () =>
+      visibleTimeline.flatMap((point) =>
+        [point.heartRate, point.bloodPressure].filter(
+          (value): value is number => typeof value === "number" && Number.isFinite(value),
+        ),
+      ),
+    [visibleTimeline],
   );
   const minChartValue = chartValues.length > 0 ? Math.min(...chartValues) - 6 : 0;
   const maxChartValue = chartValues.length > 0 ? Math.max(...chartValues) + 6 : 100;
 
-  const heartRatePath = buildLinePath(
-    visibleTimeline,
-    (point) => point.heartRate,
-    960,
-    250,
-    minChartValue,
-    maxChartValue,
+  const heartRatePath = useMemo(
+    () =>
+      buildLinePath(
+        visibleTimeline,
+        (point) => point.heartRate,
+        960,
+        250,
+        minChartValue,
+        maxChartValue,
+      ),
+    [maxChartValue, minChartValue, visibleTimeline],
   );
-  const bloodPressurePath = buildLinePath(
-    visibleTimeline,
-    (point) => point.bloodPressure,
-    960,
-    250,
-    minChartValue,
-    maxChartValue,
+  const bloodPressurePath = useMemo(
+    () =>
+      buildLinePath(
+        visibleTimeline,
+        (point) => point.bloodPressure,
+        960,
+        250,
+        minChartValue,
+        maxChartValue,
+      ),
+    [maxChartValue, minChartValue, visibleTimeline],
   );
 
   return (
@@ -799,4 +820,4 @@ export function PatientDataCanvas({
       </AppCard>
     </section>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { AgentStage, PatientOverviewResponse } from "../types";
 import { EmptyState } from "./ui/EmptyState";
@@ -95,7 +95,7 @@ function buildPatientBadge(
   return `入院 ${currentHadmId} | ${gender} | ${age} | ${diagnosisLabel}`;
 }
 
-export function DashboardHeader({
+export const DashboardHeader = memo(function DashboardHeader({
   currentHadmId,
   hadmIdInput,
   patientData,
@@ -114,8 +114,14 @@ export function DashboardHeader({
   const [isPatientListOpen, setIsPatientListOpen] = useState(false);
   const [patientSearchKeyword, setPatientSearchKeyword] = useState("");
   const patientListContainerRef = useRef<HTMLFormElement | null>(null);
-  const status = getStatus(stage, patientLoading, askLoading);
-  const patientBadge = buildPatientBadge(currentHadmId, patientData);
+  const status = useMemo(
+    () => getStatus(stage, patientLoading, askLoading),
+    [askLoading, patientLoading, stage],
+  );
+  const patientBadge = useMemo(
+    () => buildPatientBadge(currentHadmId, patientData),
+    [currentHadmId, patientData],
+  );
   const totalCount = patientOptionsTotal > 0 ? patientOptionsTotal : patientOptions.length;
   const canOpenPatientList =
     patientOptionsLoading || Boolean(patientOptionsError) || totalCount > 0;
@@ -154,10 +160,10 @@ export function DashboardHeader({
     };
   }, [isPatientListOpen]);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void onLoadPatient();
-  }
+  }, [onLoadPatient]);
 
   return (
     <header className="dashboard-header">
@@ -299,4 +305,4 @@ export function DashboardHeader({
       </div>
     </header>
   );
-}
+});

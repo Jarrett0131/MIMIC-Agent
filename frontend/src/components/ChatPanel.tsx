@@ -1,5 +1,7 @@
 import type { FormEvent, KeyboardEvent } from "react";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Virtuoso } from "react-virtuoso";
+import type { VirtuosoHandle } from "react-virtuoso";
 
 import type {
   AnswerEvidenceLink,
@@ -9,12 +11,13 @@ import type {
 } from "../types";
 import { getQuestionTypeLabel } from "../utils/labels";
 import { LinkedAnswer } from "./LinkedAnswer";
-
-// 懒加载 DevDebugPanel
-const DevDebugPanel = lazy(() => import("./DevDebugPanel").then(mod => ({ default: mod.DevDebugPanel })));
 import { AppCard } from "./ui/AppCard";
 import { EmptyState } from "./ui/EmptyState";
 import { StatusBadge } from "./ui/StatusBadge";
+
+const DevDebugPanel = lazy(() =>
+  import("./DevDebugPanel").then((mod) => ({ default: mod.DevDebugPanel })),
+);
 
 interface ChatPanelProps {
   currentHadmId: number | null;
@@ -37,7 +40,20 @@ interface ChatPanelProps {
   debugRequests?: any[];
 }
 
-export function ChatPanel({
+type ChatMessageItem =
+  | { kind: "system"; id: string; hadmId: number }
+  | { kind: "user"; id: string; question: string }
+  | {
+      kind: "assistant";
+      id: string;
+      answer: string;
+      links: AnswerEvidenceLink[];
+      questionType: AskResponse["question_type"] | undefined;
+      success: boolean;
+      isStreaming: boolean;
+    };
+
+export const ChatPanel = memo(function ChatPanel({
   currentHadmId,
   patientLoading,
   question,
@@ -58,16 +74,16 @@ export function ChatPanel({
   debugRequests = [],
 }: ChatPanelProps) {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  
-  const toggleDebugPanel = () => {
-    setShowDebugPanel((prev: boolean) => !prev);
-  };
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const isAtBottomRef = useRef(true);
+
   const canSubmit =
     currentHadmId !== null &&
     question.trim().length > 0 &&
     !askLoading &&
     !patientLoading;
-  const answerLinks = askResult?.answer_links ?? [];
+  const answerLinks = useMemo(() => askResult?.answer_links ?? [], [askResult]);
   const latestTurn = chatHistory[chatHistory.length - 1] ?? null;
   const shouldRenderPendingQuestion =
     submittedQuestion.trim().length > 0 &&
@@ -83,6 +99,87 @@ export function ChatPanel({
           latestTurn.status !== "failed" &&
           latestTurn.status !== "cancelled"))
     );
+
+  const chatItems = useMemo<ChatMessageItem[]>(() => {
+    if (currentHadmId === null) {
+      return [];
+    }
+
+    const items: ChatMessageItem[] = [
+      { kind: "system", id: `system-${currentHadmId}`, hadmId: currentHadmId },
+    ];
+
+    for (const turn of chatHistory) {
+      items.push({
+        kind: "user",
+        id: `${turn.id}-question`,
+        question: turn.question,
+      });
+
+      if (turn.response) {
+        items.push({
+          kind: "assistant",
+          id: `${turn.id}-answer`,
+          answer: turn.response.answer,
+          links: turn.response.answer_links ?? [],
+          questionType: turn.response.question_type,
+          success: turn.response.success,
+          isStreaming: false,
+        });
+      }
+    }
+
+    if (shouldRenderPendingQuestion) {
+      items.push({
+        kind: "user",
+        id: "pending-question",
+        question: submittedQuestion,
+      });
+    }
+
+    if (shouldRenderLiveAnswer) {
+      items.push({
+        kind: "assistant",
+        id: "live-answer",
+        answer: askResult?.answer ?? "",
+        links: answerLinks,
+        questionType: askResult?.question_type,
+        success: askResult?.success ?? false,
+        isStreaming: askLoading,
+      });
+    }
+
+    return items;
+  }, [
+    answerLinks,
+    askLoading,
+    askResult,
+    chatHistory,
+    currentHadmId,
+    shouldRenderLiveAnswer,
+    shouldRenderPendingQuestion,
+    submittedQuestion,
+  ]);
+  const lastChatItemId = chatItems[chatItems.length - 1]?.id ?? null;
+  const initialItemCount =
+    import.meta.env.MODE === "test" ? chatItems.length : undefined;
+
+  useEffect(() => {
+    if (!lastChatItemId || !isAtBottomRef.current) {
+      return;
+    }
+
+    virtuosoRef.current?.scrollToIndex({
+      index: chatItems.length - 1,
+      align: "end",
+      behavior: "smooth",
+    });
+  }, [chatItems.length, lastChatItemId]);
+
+  const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
+    isAtBottomRef.current = atBottom;
+    setIsAtBottom(atBottom);
+  }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,6 +207,62 @@ export function ChatPanel({
     void onSubmit();
   }
 
+  const renderChatItem = useCallback((item: ChatMessageItem) => {
+    if (item.kind === "system") {
+      return (
+        <div className="chat-message-virtual-row">
+          <article className="chat-message chat-message-system">
+            <span className="chat-message-label">当前入院</span>
+            已加载入院 <code>{item.hadmId}</code>
+          </article>
+        </div>
+      );
+    }
+
+    if (item.kind === "user") {
+      return (
+        <div className="chat-message-virtual-row">
+          <article className="chat-message chat-message-user">
+            <span className="chat-message-label">问题</span>
+            <p className="chat-message-copy">{item.question}</p>
+          </article>
+        </div>
+      );
+    }
+
+    return (
+      <div className="chat-message-virtual-row">
+        <article className="chat-message chat-message-assistant chat-message-answer">
+          <div className="chat-answer-header">
+            <div>
+              <span className="chat-message-label">回答</span>
+              <p className="chat-answer-title">
+                {item.questionType
+                  ? getQuestionTypeLabel(item.questionType)
+                  : item.isStreaming
+                    ? "正在生成中"
+                    : "回答"}
+              </p>
+            </div>
+            {item.questionType && (
+              <StatusBadge tone={item.success ? "success" : "error"}>
+                {getQuestionTypeLabel(item.questionType)}
+              </StatusBadge>
+            )}
+          </div>
+          <LinkedAnswer
+            answer={item.answer}
+            links={item.links}
+            activeLinkId={activeAnswerLinkId}
+            onHoverLink={onAnswerLinkHover}
+            onSelectLink={onAnswerLinkSelect}
+            isStreaming={item.isStreaming}
+          />
+        </article>
+      </div>
+    );
+  }, [activeAnswerLinkId, onAnswerLinkHover, onAnswerLinkSelect]);
+
   return (
     <AppCard
       className="interaction-card"
@@ -127,7 +280,7 @@ export function ChatPanel({
           )}
           {onToggleImportPanel && (
             <button
-              className={`secondary-button ${isImportPanelOpen ? 'active' : ''}`}
+              className={`secondary-button ${isImportPanelOpen ? "active" : ""}`}
               type="button"
               onClick={onToggleImportPanel}
               aria-expanded={isImportPanelOpen}
@@ -141,92 +294,24 @@ export function ChatPanel({
       <div className="interaction-scroll-region">
         {askError && <div className="error-box">{askError}</div>}
 
-        <div className="chat-stream">
-          {currentHadmId === null ? (
-            <EmptyState
-              title="请先加载患者"
-              description="在提问前请选择一个入院 ID。"
-            />
-          ) : (
-            <>
-              <article className="chat-message chat-message-system">
-                <span className="chat-message-label">当前入院</span>
-                已加载入院 <code>{currentHadmId}</code>
-              </article>
-
-              {chatHistory.map((turn) => (
-                <div key={turn.id} className="chat-turn">
-                  <article className="chat-message chat-message-user">
-                    <span className="chat-message-label">问题</span>
-                    <p className="chat-message-copy">{turn.question}</p>
-                  </article>
-                  {turn.response && (
-                    <article className="chat-message chat-message-assistant chat-message-answer">
-                      <div className="chat-answer-header">
-                        <div>
-                          <span className="chat-message-label">回答</span>
-                          <p className="chat-answer-title">
-                            {turn.response.question_type
-                              ? getQuestionTypeLabel(turn.response.question_type)
-                              : "回答"}
-                          </p>
-                        </div>
-                        {turn.response.question_type && (
-                          <StatusBadge tone={turn.response.success ? "success" : "error"}>
-                            {getQuestionTypeLabel(turn.response.question_type)}
-                          </StatusBadge>
-                        )}
-                      </div>
-                      <LinkedAnswer
-                        answer={turn.response.answer}
-                        links={turn.response.answer_links ?? []}
-                        activeLinkId={activeAnswerLinkId}
-                        onHoverLink={onAnswerLinkHover}
-                        onSelectLink={onAnswerLinkSelect}
-                        isStreaming={false}
-                      />
-                    </article>
-                  )}
-                </div>
-              ))}
-
-              {shouldRenderPendingQuestion && (
-                  <article className="chat-message chat-message-user">
-                    <span className="chat-message-label">问题</span>
-                    <p className="chat-message-copy">{submittedQuestion}</p>
-                  </article>
-                )}
-
-              {shouldRenderLiveAnswer && (
-                  <article className="chat-message chat-message-assistant chat-message-answer">
-                    <div className="chat-answer-header">
-                      <div>
-                        <span className="chat-message-label">回答</span>
-                        <p className="chat-answer-title">
-                          {askResult?.question_type
-                            ? getQuestionTypeLabel(askResult.question_type)
-                            : "正在生成中"}
-                        </p>
-                      </div>
-                      {askResult?.question_type && (
-                        <StatusBadge tone={askResult.success ? "success" : "error"}>
-                          {getQuestionTypeLabel(askResult.question_type)}
-                        </StatusBadge>
-                      )}
-                    </div>
-                    <LinkedAnswer
-                      answer={askResult?.answer ?? ""}
-                      links={answerLinks}
-                      activeLinkId={activeAnswerLinkId}
-                      onHoverLink={onAnswerLinkHover}
-                      onSelectLink={onAnswerLinkSelect}
-                      isStreaming={askLoading}
-                    />
-                  </article>
-                )}
-            </>
-          )}
-        </div>
+        {currentHadmId === null ? (
+          <EmptyState
+            title="请先加载患者"
+            description="在提问前请选择一个入院 ID。"
+          />
+        ) : (
+          <Virtuoso
+            ref={virtuosoRef}
+            className="chat-stream"
+            data={chatItems}
+            computeItemKey={(_, item) => item.id}
+            initialItemCount={initialItemCount}
+            overscan={240}
+            followOutput={isAtBottom ? "smooth" : false}
+            atBottomStateChange={handleAtBottomStateChange}
+            itemContent={(_, item) => renderChatItem(item)}
+          />
+        )}
       </div>
 
       <form className="command-form" onSubmit={handleSubmit}>
@@ -252,7 +337,7 @@ export function ChatPanel({
               <button
                 className="secondary-button"
                 type="button"
-                onClick={toggleDebugPanel}
+                onClick={() => setShowDebugPanel((prev) => !prev)}
               >
                 调试面板
               </button>
@@ -279,4 +364,4 @@ export function ChatPanel({
       </form>
     </AppCard>
   );
-}
+});
