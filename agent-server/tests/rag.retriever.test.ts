@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   resetRagCorpusCache,
   retrieveRagMatches,
-} from "../src/agent/rag/retriever";
+} from "../src/rag/retriever";
 
 describe("retrieveRagMatches", () => {
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import type { KnowledgeQuestionType } from "../../types";
+import type { KnowledgeQuestionType } from "../types";
 import type { RagExperimentDiagnostics, RagExperimentOverrides } from "./embeddingTypes";
 
 export type RagEntry = {

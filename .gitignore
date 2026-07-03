@@ -16,6 +16,9 @@ node_modules/
 frontend/dist/
 *.local
 
+# Mastra build/output cache
+.mastra/
+
 # Editor files
 .idea/
 .vscode/

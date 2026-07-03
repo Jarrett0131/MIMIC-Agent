@@ -1,6 +1,6 @@
-import { AgentError, buildErrorResponse, getHttpStatus } from "../core/errors/AgentError";
-import { writeStructuredLog } from "../logging/logger";
-import { mimicAgent } from "../mastra/agents/mimicAgent";
+import { AgentError, buildErrorResponse, getHttpStatus } from "../errors";
+import { writeStructuredLog } from "../logging";
+import { mimicAgent } from "../mastra";
 import type {
   AskPipelineDiagnostics,
   AskRequest,
@@ -13,7 +13,7 @@ import type {
   ToolTraceItem,
   WorkflowStage,
 } from "../types";
-import { isRecord } from "../utils/common";
+import { isRecord } from "../utils";
 
 const STRUCTURED_LIMITATION = "以下回答基于患者的结构化医疗数据。";
 const RAG_LIMITATION = "以下解释基于本地医学知识库。";
@@ -295,10 +295,9 @@ export function buildDefaultDiagnostics(question: string): AskPipelineDiagnostic
   };
 }
 
-type AgentMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+type AgentMessage =
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string };
 
 function buildAgentMessages(payload: ParsedAskRequest): AgentMessage[] {
   const messages: AgentMessage[] = [];
@@ -533,9 +532,12 @@ export async function runMastraAsk(
     diagnostics.routed_tool = toolsUsed[0];
     if (toolsUsed.includes("retrieveKnowledge")) {
       diagnostics.rag = {
-        ...diagnostics.rag,
+        enabled: true,
         used: true,
+        route_type: "knowledge_query",
         matched: evidence.some((item) => item.type === "text"),
+        knowledge_types: [],
+        top_results: [],
       };
     }
 

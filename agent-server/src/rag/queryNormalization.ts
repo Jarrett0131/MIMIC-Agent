@@ -1,12 +1,12 @@
-import { RAG_LLM_QUERY_ENABLED } from "../../config";
-import { getLlmScenario } from "../../config/llmScenarios";
-import { writeStructuredLog } from "../../logging/logger";
+import { RAG_LLM_QUERY_ENABLED } from "../config";
+import { getLlmScenario } from "../config";
+import { writeStructuredLog } from "../logging";
 import {
   generateLlmJson,
   getLlmAvailability,
   LlmClientError,
-} from "../../services/llmClient";
-import type { KnowledgeQuestionType } from "../../types";
+} from "../services/llmClient";
+import type { KnowledgeQuestionType } from "../types";
 
 type RagQueryNormalizationPayload = {
   normalized_query?: string;

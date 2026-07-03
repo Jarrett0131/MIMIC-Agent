@@ -1,6 +1,6 @@
 import app from "./app";
 import { PORT } from "./config";
-import { writeStructuredLog } from "./logging/logger";
+import { writeStructuredLog } from "./logging";
 
 app.listen(PORT, () => {
   writeStructuredLog("server.start", {

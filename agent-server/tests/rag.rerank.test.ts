@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { retrieveRagMatches } from "../src/agent/rag/retriever";
+import { retrieveRagMatches } from "../src/rag/retriever";
 
 describe("rag optional rerank layer", () => {
   it("keeps the baseline hybrid retriever unchanged when rerank is disabled", async () => {

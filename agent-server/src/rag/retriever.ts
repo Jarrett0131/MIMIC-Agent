@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { RAG_ENABLED } from "../../config";
-import { writeStructuredLog } from "../../logging/logger";
-import type { KnowledgeQuestionType } from "../../types";
+import { RAG_ENABLED } from "../config";
+import { writeStructuredLog } from "../logging";
+import type { KnowledgeQuestionType } from "../types";
 import { normalizeRagQuery } from "./queryNormalization";
 import { applyOptionalRerank } from "./rerank";
 import type { RagEntry, RagMatch, RagRetrieveInput, RagRetrievalResult } from "./types";
@@ -475,11 +475,11 @@ async function findDocsDirectory(): Promise<string | null> {
     path.resolve(process.cwd(), "docs/rag"),
     path.resolve(process.cwd(), "../docs/rag"),
     // Covers the Mastra dev/build output dir (agent-server/.mastra/output).
-    path.resolve(process.cwd(), "../../../docs/rag"),
+    path.resolve(process.cwd(), "../../docs/rag"),
     // __dirname only exists in CJS builds (ts-node-dev / tsc); the Mastra
     // bundle is ESM, so guard it instead of referencing it unconditionally.
     ...(typeof __dirname !== "undefined"
-      ? [path.resolve(__dirname, "../../../../docs/rag")]
+      ? [path.resolve(__dirname, "../../docs/rag")]
       : []),
   ];
 

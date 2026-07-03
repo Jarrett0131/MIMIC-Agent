@@ -1,12 +1,15 @@
-﻿import cors from "cors";
+import cors from "cors";
 import express from "express";
 
 import askRouter from "./routes/ask";
-import importsRouter from "./routes/imports";
-import labsRouter from "./routes/labs";
-import patientRouter from "./routes/patient";
-import patientsRouter from "./routes/patients";
-import vitalsRouter from "./routes/vitals";
+import {
+  diagnosesRouter,
+  importsRouter,
+  labsRouter,
+  patientRouter,
+  patientsRouter,
+  vitalsRouter,
+} from "./routes/rest";
 import { fetchPythonHealth, PythonClientError } from "./services/pythonClient";
 
 const app = express();
@@ -38,8 +41,9 @@ app.get("/health", async (_req, res) => {
 app.use("/ask", askRouter);
 app.use("/imports", importsRouter);
 app.use("/labs", labsRouter);
+app.use("/vitals", vitalsRouter);
 app.use("/patient", patientRouter);
 app.use("/patients", patientsRouter);
-app.use("/vitals", vitalsRouter);
+app.use("/diagnoses", diagnosesRouter);
 
 export default app;

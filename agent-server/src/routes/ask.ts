@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Request, Response, Router } from "express";
 
-import { buildAskLogEntry, logAskRequest } from "../logging/askLogger";
-import { runWithRequestContext } from "../logging/requestContext";
+import { buildAskLogEntry, logAskRequest } from "../logging";
+import { runWithRequestContext } from "../logging";
 import {
   buildDefaultDiagnostics,
   buildInvalidRequestResponse,

@@ -9,8 +9,8 @@ import {
   LLM_RETRY_TIMES,
   LLM_TIMEOUT_MS,
 } from "../config";
-import { writeStructuredLog } from "../logging/logger";
-import { recordLlmCallEvent } from "../logging/requestContext";
+import { writeStructuredLog } from "../logging";
+import { recordLlmCallEvent } from "../logging";
 
 type LlmRole = "system" | "user" | "assistant";
 type SupportedLlmProvider = "aliyun" | "deepseek" | "openai";

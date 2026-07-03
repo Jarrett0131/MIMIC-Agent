@@ -12,8 +12,8 @@ import {
   RAG_EMBEDDING_PROVIDER,
   RAG_RERANK_CANDIDATE_LIMIT,
   RAG_RERANK_ENABLED,
-} from "../../config";
-import { writeStructuredLog } from "../../logging/logger";
+} from "../config";
+import { writeStructuredLog } from "../logging";
 import type { RagEntry } from "./types";
 import type {
   EmbeddingProvider,
@@ -37,15 +37,20 @@ function toAbsoluteCachePath(cachePath: string): string {
     return cachePath;
   }
 
+  // __dirname only exists in CJS; under the ESM Mastra bundle fall back to cwd.
+  const baseRoot =
+    typeof __dirname !== "undefined"
+      ? path.resolve(__dirname, "../../")
+      : process.cwd();
   const candidates = [
     path.resolve(process.cwd(), cachePath),
     path.resolve(process.cwd(), "agent-server", cachePath),
-    path.resolve(__dirname, "../../../../", cachePath),
+    path.resolve(baseRoot, cachePath),
   ];
 
   const existing = candidates.find((candidate) => {
     const normalizedCandidate = path.normalize(candidate);
-    const normalizedRoot = path.normalize(path.resolve(__dirname, "../../../../"));
+    const normalizedRoot = path.normalize(baseRoot);
     return normalizedCandidate.startsWith(normalizedRoot);
   });
 

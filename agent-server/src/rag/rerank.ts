@@ -4,7 +4,7 @@ import {
   getQueryEmbedding,
   resolveRagExperimentConfig,
 } from "./embeddingCache";
-import type { RagRerankInput, RagExperimentDiagnostics } from "./embeddingTypes";
+import type { RagRerankInput, RagExperimentDiagnostics } from "./embeddingTypes.js";
 import type { RagMatch } from "./types";
 
 function toScore(value: number): number {

@@ -4,7 +4,7 @@ import type {
   ErrorSource,
   ToolTraceItem,
   WorkflowStage,
-} from "../../types";
+} from "./types";
 
 const DEFAULT_ERROR_MESSAGE = "The agent could not complete the request.";
 const DEFAULT_LIMITATION =
