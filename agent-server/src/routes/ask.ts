@@ -4,11 +4,12 @@ import { Request, Response, Router } from "express";
 import { buildAskLogEntry, logAskRequest } from "../logging/askLogger";
 import { runWithRequestContext } from "../logging/requestContext";
 import {
+  buildDefaultDiagnostics,
   buildInvalidRequestResponse,
   parseAskRequest,
-  runAskPipeline,
+  runMastraAsk,
   wantsStreamResponse,
-} from "../services/askPipeline";
+} from "../services/mastraAsk";
 import type { AskPipelineDiagnostics, AskResponse, AskStreamEvent } from "../types";
 
 const router = Router();
@@ -48,29 +49,10 @@ function buildInvalidRequestDiagnostics(
   question: string,
   response: AskResponse,
 ): AskPipelineDiagnostics {
-  return {
-    original_question: question,
-    resolved_question: question,
-    rewrite: {
-      enabled: false,
-      original_question: question,
-      rewritten_question: question,
-      changed: false,
-      source: "none",
-      reason: "invalid_request",
-      guard_applied: false,
-      guard_reason: "invalid_request",
-    },
-    rag: {
-      enabled: false,
-      used: false,
-      matched: false,
-      knowledge_types: [],
-      top_results: [],
-    },
-    success: false,
-    error_code: response.error?.code ?? undefined,
-  };
+  const diagnostics = buildDefaultDiagnostics(question);
+  diagnostics.rewrite.reason = "invalid_request";
+  diagnostics.error_code = response.error?.code ?? undefined;
+  return diagnostics;
 }
 
 function buildStreamMetaResponse(response: AskResponse): AskResponse {
@@ -155,7 +137,7 @@ async function streamAskResponse(
     }
   });
 
-  const pipelineResult = await runAskPipeline(payload, {
+  const result = await runMastraAsk(payload, {
     onWorkflow: async (workflowState) => {
       if (connectionClosed) {
         return;
@@ -191,63 +173,35 @@ async function streamAskResponse(
     return;
   }
 
-  if (!pipelineResult.ok) {
-    writeAskLog({
-      requestId: requestMeta.requestId,
-      createdAt: requestMeta.createdAt,
-      startedAt: requestMeta.startedAt,
-      hadmId: payload.hadm_id,
-      question: payload.question,
-      response: pipelineResult.response,
-      diagnostics: pipelineResult.diagnostics,
-    });
-    writeStreamEvent(res, {
-      type: "complete",
-      response: pipelineResult.response,
-    });
-    res.end();
-    return;
-  }
-
-  const metaResponse = buildStreamMetaResponse(pipelineResult.response);
   writeAskLog({
     requestId: requestMeta.requestId,
     createdAt: requestMeta.createdAt,
     startedAt: requestMeta.startedAt,
     hadmId: payload.hadm_id,
     question: payload.question,
-    response: pipelineResult.response,
-    diagnostics: pipelineResult.diagnostics,
-  });
-  writeStreamEvent(res, {
-    type: "meta",
-    response: metaResponse,
+    response: result.response,
+    diagnostics: result.diagnostics,
   });
 
-  if (!pipelineResult.streamedAnswer) {
-    let accumulatedAnswer = "";
-    for (const chunk of pipelineResult.answerChunks) {
-      if (connectionClosed || res.writableEnded) {
-        break;
-      }
-
-      accumulatedAnswer += chunk;
-      writeStreamEvent(res, {
-        type: "answer_delta",
-        delta: chunk,
-        answer: accumulatedAnswer,
-      });
-      await yieldToEventLoop();
-    }
-  }
-
-  if (!connectionClosed && !res.writableEnded) {
+  if (!result.ok) {
     writeStreamEvent(res, {
       type: "complete",
-      response: pipelineResult.response,
+      response: result.response,
     });
+    res.end();
+    return;
   }
 
+  // Answer deltas were already streamed natively via onAnswerDelta; emit the
+  // metadata (evidence, tool trace, suggestions) and the final response.
+  writeStreamEvent(res, {
+    type: "meta",
+    response: buildStreamMetaResponse(result.response),
+  });
+  writeStreamEvent(res, {
+    type: "complete",
+    response: result.response,
+  });
   res.end();
 }
 
@@ -283,23 +237,23 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
-    const pipelineResult = await runAskPipeline(payload);
+    const result = await runMastraAsk(payload);
     writeAskLog({
       requestId,
       createdAt,
       startedAt,
       hadmId: payload.hadm_id,
       question: payload.question,
-      response: pipelineResult.response,
-      diagnostics: pipelineResult.diagnostics,
+      response: result.response,
+      diagnostics: result.diagnostics,
     });
 
-    if (pipelineResult.ok) {
-      res.json(pipelineResult.response);
+    if (result.ok) {
+      res.json(result.response);
       return;
     }
 
-    res.status(pipelineResult.status).json(pipelineResult.response);
+    res.status(result.status).json(result.response);
   });
 });
 

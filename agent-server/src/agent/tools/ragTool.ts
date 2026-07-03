@@ -3,7 +3,17 @@ import type { KnowledgeQuestionType } from "../../types";
 import { retrieveRagMatches } from "../rag/retriever";
 import type { RagExperimentDiagnostics } from "../rag/embeddingTypes";
 import type { RagMatch } from "../rag/types";
-import type { ToolContext, ToolResult } from "../toolRegistry";
+export type ToolContext = {
+  hadm_id: number;
+  question: string;
+};
+
+export type ToolResult = {
+  tool: string;
+  args: Record<string, unknown>;
+  data: unknown;
+  result_count?: number;
+};
 
 type RagToolPayload = {
   enabled: boolean;
